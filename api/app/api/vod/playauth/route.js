@@ -183,6 +183,9 @@ async function resolveDefaultPlayback(baseParams) {
 export async function GET(request) {
   const searchParams = request.nextUrl.searchParams;
   const vid = (searchParams.get("vid") || "").trim();
+  const forceHlsProxy = ["1", "true", "yes"].includes(
+    String(searchParams.get("proxy") || "").toLowerCase(),
+  );
 
   if (!vid) {
     return NextResponse.json(
@@ -289,7 +292,7 @@ export async function GET(request) {
     return NextResponse.json(
       {
         defaultPlaybackSource: defaultPlayback.source,
-        preferredPlaybackSource: shouldUseHlsProxy()
+        preferredPlaybackSource: forceHlsProxy || shouldUseHlsProxy()
           ? getHlsProxyUrl(signedPlaybackUrl, request.nextUrl.origin)
           : signedPlaybackUrl,
         directPlaybackSource: signedPlaybackUrl,
@@ -297,7 +300,7 @@ export async function GET(request) {
           signedPlaybackUrl,
           request.nextUrl.origin,
         ),
-        isHlsProxyEnabled: shouldUseHlsProxy(),
+        isHlsProxyEnabled: forceHlsProxy || shouldUseHlsProxy(),
         preferredPlaybackStreamType: defaultPlayback.streamType,
         playDomain: process.env.BYTEPLUS_VOD_PLAY_DOMAIN || DEFAULT_PLAY_DOMAIN,
         subtitles,

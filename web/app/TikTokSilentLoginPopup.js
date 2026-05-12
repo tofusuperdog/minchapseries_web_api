@@ -90,6 +90,9 @@ const formatError = (error) => {
   return error.message || error.errMsg || JSON.stringify(error);
 };
 
+const getRuntimeDetails = () =>
+  `TTMinis exists=${Boolean(window.TTMinis)}, login type=${typeof window.TTMinis?.login}, SDK ready=${Boolean(window.__MINCHAP_TIKTOK_SDK_READY__)}, origin=${window.location?.origin || "-"}, api=${getApiUrl("") || "-"}`;
+
 export default function TikTokSilentLoginPopup() {
   const [isOpen, setIsOpen] = useState(false);
   const [state, setState] = useState({
@@ -188,7 +191,7 @@ export default function TikTokSilentLoginPopup() {
           status: "error",
           title: "TikTok Silent Login Failed",
           message: formatError(error),
-          details: `TTMinis exists=${Boolean(window.TTMinis)}, login type=${typeof window.TTMinis?.login}, SDK ready=${Boolean(window.__MINCHAP_TIKTOK_SDK_READY__)}`,
+          details: getRuntimeDetails(),
           user: null,
         });
       }

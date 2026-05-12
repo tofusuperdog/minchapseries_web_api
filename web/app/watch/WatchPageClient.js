@@ -16,6 +16,9 @@ import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 const BYTEPLUS_LICENSE =
   process.env.NEXT_PUBLIC_BYTEPLUS_LICENSE ||
   "https://sf16-vod-license-multi.byteplusvod.com/obj/vod-license-sgcom/l-1122314769-ch-vod-a-1006938.lic";
+const FORCE_HLS_PROXY =
+  process.env.NEXT_PUBLIC_FORCE_HLS_PROXY === "true" ||
+  process.env.NEXT_PUBLIC_FORCE_HLS_PROXY === "1";
 const SUBTITLE_OFFSET_BOTTOM_PERCENT = 25;
 
 const headers = SUPABASE_HEADERS;
@@ -808,9 +811,12 @@ export default function WatchPage() {
         return false;
       }
 
-      const playAuthResponse = await fetch(
-        getApiUrl(`/api/vod/playauth?vid=${encodeURIComponent(vid)}`),
+      const playAuthUrl = getApiUrl(
+        `/api/vod/playauth?vid=${encodeURIComponent(vid)}${
+          FORCE_HLS_PROXY ? "&proxy=1" : ""
+        }`,
       );
+      const playAuthResponse = await fetch(playAuthUrl);
       const playAuthData = await playAuthResponse.json();
 
       const hlsPlaybackUrl = playAuthData.preferredPlaybackSource || "";

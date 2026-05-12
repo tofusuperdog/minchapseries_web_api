@@ -5,6 +5,14 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:3001",
 ];
 
+function wildcardToRegExp(pattern) {
+  const escaped = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+
+  return new RegExp(`^${escaped}$`, "i");
+}
+
 function getAllowedOrigins() {
   const configuredOrigins = String(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
@@ -16,16 +24,25 @@ function getAllowedOrigins() {
     : DEFAULT_ALLOWED_ORIGINS;
 }
 
+function isOriginAllowed(origin, allowedOrigins) {
+  if (allowedOrigins.includes("*")) return true;
+  if (allowedOrigins.includes(origin)) return true;
+
+  return allowedOrigins
+    .filter((allowedOrigin) => allowedOrigin.includes("*"))
+    .some((allowedOrigin) => wildcardToRegExp(allowedOrigin).test(origin));
+}
+
 export function getCorsHeaders(request) {
   const origin = request?.headers?.get("origin") || "";
   const allowedOrigins = getAllowedOrigins();
-  const allowOrigin = allowedOrigins.includes(origin)
+  const allowOrigin = origin && isOriginAllowed(origin, allowedOrigins)
     ? origin
     : allowedOrigins[0];
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Range, Authorization",
     "Access-Control-Expose-Headers":
       "Content-Length, Content-Range, Accept-Ranges, X-Subtitle-Converted, X-Subtitle-Cue-Count, X-Subtitle-First-Cue-Ms, X-Subtitle-Offset-Ms",
