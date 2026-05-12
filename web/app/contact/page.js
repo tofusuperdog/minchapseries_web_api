@@ -5,16 +5,74 @@ import { useRouter } from "next/navigation";
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { getApiUrl } from "../lib/apiBaseUrl";
+
+const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
+
+function readStoredCustomerId() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const storedUser = JSON.parse(
+      window.localStorage.getItem(TIKTOK_USER_STORAGE_KEY) || "null",
+    );
+
+    return storedUser?.id || null;
+  } catch {
+    return null;
+  }
+}
 
 export default function ContactPage() {
   const { t, language, changeLanguage } = useLanguage();
   const router = useRouter();
 
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [submitStatus, setSubmitStatus] = useState("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
   const langDropdownRef = useRef(null);
   const languages = ["TH", "EN", "JP", "CN"];
 
   useClickOutside(langDropdownRef, () => setIsLangOpen(false));
+
+  const updateForm = (field) => (event) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      [field]: event.target.value,
+    }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitStatus("submitting");
+    setSubmitMessage("");
+
+    try {
+      const response = await fetch(getApiUrl("/api/contact"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          customerId: readStoredCustomerId(),
+          locale: language,
+          source: "tiktok-mini",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to send message");
+      }
+
+      setForm({ name: "", email: "", message: "" });
+      setSubmitStatus("success");
+      setSubmitMessage("ส่งข้อความเรียบร้อยแล้ว");
+    } catch (error) {
+      setSubmitStatus("error");
+      setSubmitMessage(error?.message || "ไม่สามารถส่งข้อความได้");
+    }
+  };
 
   return (
     <div className="flex flex-col w-full min-h-[calc(100vh-70px)] overflow-y-auto text-white bg-black pt-[60px]">
@@ -196,7 +254,10 @@ export default function ContactPage() {
           </div>
         </div>
 
-        <div className="relative z-10 mt-3 flex w-full max-w-[360px] flex-col gap-4 rounded-[18px] border border-[#9b4dff]/70 bg-[linear-gradient(180deg,rgba(23,18,31,0.94),rgba(8,7,13,0.96))] p-4 shadow-[0_0_22px_rgba(157,78,255,0.28)]">
+        <form
+          onSubmit={handleSubmit}
+          className="relative z-10 mt-3 flex w-full max-w-[360px] flex-col gap-4 rounded-[18px] border border-[#9b4dff]/70 bg-[linear-gradient(180deg,rgba(23,18,31,0.94),rgba(8,7,13,0.96))] p-4 shadow-[0_0_22px_rgba(157,78,255,0.28)]"
+        >
           {/* Name Field */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[13px] font-semibold text-white/82">
@@ -204,7 +265,10 @@ export default function ContactPage() {
             </label>
             <input
               type="text"
+              value={form.name}
+              onChange={updateForm("name")}
               placeholder={t("name_placeholder")}
+              required
               className="h-11 w-full rounded-lg border border-[#76509a]/70 bg-white/[0.06] px-4 text-[14px] text-white outline-none transition-colors placeholder:text-white/34 focus:border-[#c77dff] focus:bg-white/[0.09]"
             />
           </div>
@@ -216,7 +280,10 @@ export default function ContactPage() {
             </label>
             <input
               type="email"
+              value={form.email}
+              onChange={updateForm("email")}
               placeholder={t("email_placeholder")}
+              required
               className="h-11 w-full rounded-lg border border-[#76509a]/70 bg-white/[0.06] px-4 text-[14px] text-white outline-none transition-colors placeholder:text-white/34 focus:border-[#c77dff] focus:bg-white/[0.09]"
             />
           </div>
@@ -228,15 +295,19 @@ export default function ContactPage() {
             </label>
             <textarea
               rows={6}
+              value={form.message}
+              onChange={updateForm("message")}
               placeholder={t("message_placeholder")}
+              required
               className="min-h-[88px] w-full resize-none rounded-lg border border-[#76509a]/70 bg-white/[0.06] p-4 text-[14px] text-white outline-none transition-colors placeholder:text-white/34 focus:border-[#c77dff] focus:bg-white/[0.09]"
             />
           </div>
-        </div>
 
-        {/* Submit Button */}
-        <div className="relative z-10 mt-3 flex w-full max-w-[360px] flex-col items-center gap-4">
-          <button className="flex h-11 w-[300px] items-center justify-center gap-3 rounded-xl bg-[linear-gradient(180deg,#d145ff_0%,#8318e5_100%)] text-[16px] font-extrabold text-white shadow-[0_10px_24px_rgba(162,35,255,0.48)] transition-all active:scale-95">
+          <button
+            type="submit"
+            disabled={submitStatus === "submitting"}
+            className="mx-auto flex h-11 w-[300px] items-center justify-center gap-3 rounded-xl bg-[linear-gradient(180deg,#d145ff_0%,#8318e5_100%)] text-[16px] font-extrabold text-white shadow-[0_10px_24px_rgba(162,35,255,0.48)] transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          >
             <svg
               className="w-5 h-5 -rotate-12"
               viewBox="0 0 24 24"
@@ -250,9 +321,22 @@ export default function ContactPage() {
               <path d="m22 2-7 20-4-9-9-4 20-7Z" />
               <path d="M22 2 11 13" />
             </svg>
-            {t("send_message")}
+            {submitStatus === "submitting" ? "กำลังส่ง..." : t("send_message")}
           </button>
 
+          {submitMessage ? (
+            <p
+              className={`text-center text-[13px] font-semibold ${
+                submitStatus === "success" ? "text-emerald-300" : "text-red-300"
+              }`}
+            >
+              {submitMessage}
+            </p>
+          ) : null}
+        </form>
+
+        {/* Footer Note */}
+        <div className="relative z-10 mt-3 flex w-full max-w-[360px] flex-col items-center gap-4">
           <div className="flex flex-col items-center gap-1 text-center">
             <p className="flex items-center gap-1.5 text-[13px] font-bold text-white/88">
               <span className="text-[#bf72ff]">❤</span>
