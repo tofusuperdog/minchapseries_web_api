@@ -1,0 +1,388 @@
+"use client";
+
+import { useLanguage } from "../LanguageContext";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
+import { useClickOutside } from "../hooks/useClickOutside";
+
+export default function VipPage() {
+  const { t, language, changeLanguage } = useLanguage();
+  const router = useRouter();
+
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  const langDropdownRef = useRef(null);
+  const languages = ["TH", "EN", "JP", "CN"];
+
+  useEffect(() => {
+    async function fetchPackages() {
+      try {
+        const response = await fetch(
+          supabaseRestUrl("vip_package?select=*&order=sort_order"),
+          {
+            headers: SUPABASE_HEADERS,
+          },
+        );
+        const data = await response.json();
+        setPackages(data);
+      } catch (err) {
+        console.error("Failed to fetch VIP packages:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPackages();
+  }, []);
+
+  useClickOutside(langDropdownRef, () => setIsLangOpen(false));
+
+  const benefits = [
+    { id: 1, text: t("no_ads") },
+    { id: 2, text: t("all_episodes") },
+    { id: 3, text: t("unlimited_rewatch") },
+  ];
+
+  // Map database type to localized title if possible, else use DB type
+  const getPackageTitle = (pkg) => {
+    const type = pkg.type.toLowerCase();
+    if (type.includes("สัปดาห์") || type.includes("weekly"))
+      return t("weekly_vip");
+    if (type.includes("เดือน") || type.includes("monthly"))
+      return t("monthly_vip");
+    if (Number(pkg.price_thb) === 129) return t("weekly_vip");
+    if (Number(pkg.price_thb) === 359) return t("monthly_vip");
+    return pkg.type;
+  };
+
+  const getPackageDescription = (pkg) => {
+    const type = pkg.type.toLowerCase();
+    if (type.includes("weekly") || Number(pkg.price_thb) === 129)
+      return t("weekly_vip_desc");
+    if (type.includes("monthly") || Number(pkg.price_thb) === 359)
+      return t("monthly_vip_desc");
+    return t("unlimited_watch");
+  };
+
+  // Get price and unit based on language
+  const getPriceInfo = (pkg) => {
+    switch (language) {
+      case "EN":
+        return { price: pkg.price_usd, unit: "USD" };
+      case "JP":
+        return { price: pkg.price_jpy, unit: "JPY" };
+      case "CN":
+        return { price: pkg.price_cny, unit: "CNY" };
+      default:
+        return { price: pkg.price_thb, unit: t("price_baht") };
+    }
+  };
+
+  const getThaiPriceInfo = (pkg) => ({
+    price: pkg.price_thb,
+    unit: "บาท",
+  });
+
+  const getThaiPackageTitle = (pkg) => {
+    const type = pkg.type.toLowerCase();
+    if (
+      type.includes("à¸ªà¸±à¸›à¸”à¸²à¸«à¹Œ") ||
+      type.includes("weekly") ||
+      Number(pkg.price_thb) === 129
+    ) {
+      return "รายสัปดาห์ - VIP";
+    }
+    if (
+      type.includes("à¹€à¸”à¸·à¸­à¸™") ||
+      type.includes("monthly") ||
+      Number(pkg.price_thb) === 359
+    ) {
+      return "รายเดือน - VIP";
+    }
+    return pkg.type;
+  };
+
+  const getPaymentNotice = (pkg) => {
+    const title = getThaiPackageTitle(pkg);
+    const { price, unit } = getThaiPriceInfo(pkg);
+
+    return `แพ็กเกจ ${title} ราคา ${price} ${unit}`;
+  };
+
+  const getLocalizedPaymentNotice = (pkg) => {
+    const title = getPackageTitle(pkg);
+    const { price, unit } = getPriceInfo(pkg);
+
+    switch (language) {
+      case "EN":
+        return `Package ${title}: ${price} ${unit}`;
+      case "JP":
+        return `パッケージ ${title}: ${price} ${unit}`;
+      case "CN":
+        return `套餐 ${title}: ${price} ${unit}`;
+      default:
+        return `แพ็กเกจ ${title} ราคา ${price} ${unit}`;
+    }
+  };
+
+  return (
+    <div className="flex flex-col w-full h-screen pb-10 pt-[60px] overflow-hidden text-white bg-black">
+      {/* Custom Header based on Screenshot */}
+      <header className="fixed left-0 right-0 top-0 z-50 flex h-[60px] items-center justify-between px-4 bg-black/80 backdrop-blur-md">
+        <button onClick={() => router.back()} className="p-1">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+
+        <div className="flex items-center">
+          <img
+            src="/minchap.svg"
+            alt="MinChap"
+            className="object-contain w-auto h-6"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Language Selection Dropdown */}
+          <div className="relative" ref={langDropdownRef}>
+            <button
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="flex items-center gap-1 rounded bg-[#1A1A1A] px-2 py-1 text-xs font-semibold text-white/90 border border-white/10 uppercase"
+            >
+              {language}
+              <svg
+                className={`h-3 w-3 transition-transform ${isLangOpen ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-20 rounded-lg bg-[#1A1A1A] shadow-lg border border-white/10 py-1 flex flex-col z-50">
+                {languages.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => {
+                      changeLanguage(lang);
+                      setIsLangOpen(false);
+                    }}
+                    className={`px-4 py-2 text-sm text-left hover:bg-white/10 transition-colors ${language === lang ? "text-white font-bold" : "text-white/60"}`}
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button className="flex items-center justify-center w-8 h-8 rounded text-white/90">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="1"></circle>
+              <circle cx="19" cy="12" r="1"></circle>
+              <circle cx="5" cy="12" r="1"></circle>
+            </svg>
+          </button>
+          <button onClick={() => router.push("/")} className="p-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex flex-col px-6 pt-4">
+        {/* VIP Branding Section */}
+        <div className="mb-7 flex items-center gap-4 rounded-[18px] bg-white/[0.025] px-1 py-2">
+          <div className="relative h-[64px] w-[64px] shrink-0">
+            <img
+              src="/popcorn.svg"
+              alt="Popcorn"
+              className="h-full w-full object-contain drop-shadow-[0_10px_16px_rgba(0,0,0,0.45)]"
+            />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1 text-left">
+            <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">
+              {t("subscribe_vip")}
+            </h1>
+            <p className="text-[15px] font-medium leading-tight text-white/64">
+              {t("unlimited_watch")}
+            </p>
+          </div>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="flex flex-col gap-4 mb-8">
+          {loading ? (
+            <div className="flex justify-center w-full py-10">
+              <div className="w-6 h-6 border-2 border-[#BF8EFF] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            packages.map((pkg) => {
+              const { price, unit } = getPriceInfo(pkg);
+              const title = getPackageTitle(pkg);
+              const description = getPackageDescription(pkg);
+
+              return (
+                <button
+                  type="button"
+                  key={pkg.id}
+                  onClick={() => setSelectedPackage(pkg)}
+                  className={`relative w-full rounded-2xl p-5 overflow-hidden transition-all active:scale-95 scroll-mt-20 ${
+                    pkg.is_recommended
+                      ? "border border-[#C15BFF] bg-[radial-gradient(circle_at_36%_19%,rgba(235,188,255,0.16),transparent_18%),linear-gradient(115deg,#1B0A25_0%,#2F1544_48%,#16091F_100%)] shadow-[0_0_24px_rgba(178,55,255,0.26),inset_0_0_22px_rgba(199,91,255,0.13)]"
+                      : "bg-[#121212] border border-white/10"
+                  }`}
+                >
+                  {pkg.is_recommended && (
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_19%_34%,rgba(255,255,255,0.23),transparent_2px),radial-gradient(circle_at_24%_16%,rgba(255,151,236,0.55),transparent_2px),radial-gradient(circle_at_16%_57%,rgba(255,222,130,0.34),transparent_3px)]" />
+                  )}
+
+                  {pkg.is_recommended && (
+                    <div className="absolute right-0 top-0 z-10 rounded-bl-xl bg-gradient-to-b from-[#B24BFF] to-[#7800D7] px-4 py-1.5 text-[12px] font-bold uppercase tracking-wider text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_20px_rgba(143,42,255,0.38)]">
+                      {t("popular_badge")}
+                    </div>
+                  )}
+
+                  <div className="relative z-10 flex items-start justify-between">
+                    <div className="flex gap-4">
+                      <div className="flex flex-col text-left">
+                        <h3
+                          className={`text-xl font-bold mb-0.5 ${pkg.is_recommended ? "text-white" : "text-white/90"}`}
+                        >
+                          {title}
+                        </h3>
+                        <p
+                          className={`text-[14px] pt-1 font-medium ${pkg.is_recommended ? "text-white/86" : "text-white/60"}`}
+                        >
+                          {description}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={`text-[24px] font-extrabold whitespace-nowrap pt-6 ${pkg.is_recommended ? "text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.42)]" : "text-white/90"}`}
+                    >
+                      {price} {unit}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Benefits Box */}
+        <div className="w-full rounded-[22px] border border-white/20 bg-[radial-gradient(circle_at_88%_35%,rgba(119,51,191,0.16),transparent_35%),linear-gradient(120deg,rgba(27,27,31,0.92),rgba(12,12,15,0.98))] px-7 pt-4 pb-2 shadow-[inset_0_0_28px_rgba(255,255,255,0.03)]">
+          <h4 className="mb-2 text-left text-[18px] font-extrabold leading-tight text-white">
+            {t("vip_benefits")}
+          </h4>
+          <div className="flex flex-col">
+            {benefits.map((benefit, index) => (
+              <div key={benefit.id}>
+                <div className="flex items-center gap-4 py-3">
+                  <div className="flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#C344FF] to-[#6400C8] text-white shadow-[0_0_12px_rgba(184,65,255,0.62)]">
+                    <svg
+                      className="h-2.5 w-2.5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                  <span className="text-[16px]  leading-tight text-white/92">
+                    {benefit.text}
+                  </span>
+                </div>
+                {index < benefits.length - 1 && (
+                  <div className="ml-[50px] h-[1px] bg-white/12" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {selectedPackage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 px-5 backdrop-blur-sm">
+          <div className="relative w-full max-w-[360px] overflow-hidden rounded-2xl border border-[#BF8EFF]/25 bg-[#12091D] shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#E91E63] via-[#BF8EFF] to-[#6000B3]" />
+            <div className="p-6 text-center pt-7">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#6000B3]/30 ring-1 ring-[#BF8EFF]/30">
+                <img
+                  src="/popcorn.svg"
+                  alt="VIP"
+                  className="object-contain w-8 h-8 drop-shadow"
+                />
+              </div>
+              <h2 className="mb-3 text-2xl font-bold text-white">
+                {t("subscribe_vip")}
+              </h2>
+              <div className="space-y-2 text-[15px] leading-relaxed text-white/78">
+                <p>{t("payment_development_notice")}</p>
+                <p className="text-[#BF8EFF]">
+                  {t("payment_flow_label")} : vip_payment_flow
+                </p>
+                <p>{getLocalizedPaymentNotice(selectedPackage)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPackage(null)}
+                className="mt-6 h-12 w-full rounded-xl bg-gradient-to-r from-[#6000B3] to-[#8A2BE2] text-[15px] font-bold text-white shadow-[0_10px_24px_rgba(96,0,179,0.35)] transition-transform active:scale-[0.98]"
+              >
+                {t("ok")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

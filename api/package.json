@@ -1,0 +1,16 @@
+{
+  "name": "minchap-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 4000",
+    "build": "next build",
+    "start": "next start -p 4000"
+  },
+  "dependencies": {
+    "@byteplus/vcloud-sdk-nodejs": "^1.0.7",
+    "next": "16.2.3",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  }
+}
