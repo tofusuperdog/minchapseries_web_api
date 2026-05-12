@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { corsOptionsResponse, withCorsHeaders } from "../../../lib/cors";
+import { upsertTikTokCustomer } from "../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,9 +106,12 @@ export async function POST(request) {
       );
     }
 
+    const customer = await upsertTikTokCustomer(token.open_id);
+
     return json(request, {
       ok: true,
       user: {
+        id: customer?.id || null,
         open_id: token.open_id,
         scope: token.scope || "",
         token_type: token.token_type || "",

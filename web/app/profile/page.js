@@ -5,12 +5,43 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
+const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
+
+function readStoredUserId() {
+  if (typeof window === "undefined") return "-";
+
+  try {
+    const storedUser = JSON.parse(
+      window.localStorage.getItem(TIKTOK_USER_STORAGE_KEY) || "null",
+    );
+
+    return storedUser?.id ? String(storedUser.id) : "-";
+  } catch {
+    return "-";
+  }
+}
+
 export default function AppProfile() {
   const { language, t } = useLanguage();
   const [isVipActive, setIsVipActive] = useState(true);
   const [version, setVersion] = useState("1.01");
+  const [userId, setUserId] = useState("-");
 
   const headers = SUPABASE_HEADERS;
+
+  useEffect(() => {
+    setUserId(readStoredUserId());
+
+    const updateUserId = () => setUserId(readStoredUserId());
+
+    window.addEventListener("storage", updateUserId);
+    window.addEventListener("minchap:tiktok-user-updated", updateUserId);
+
+    return () => {
+      window.removeEventListener("storage", updateUserId);
+      window.removeEventListener("minchap:tiktok-user-updated", updateUserId);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -88,7 +119,7 @@ export default function AppProfile() {
             </h2>
             <div className="text-[15px]  leading-tight text-white/72">
               {t("profile_user_id")}:{" "}
-              <span className="text-[#B985FF]">200234</span>
+              <span className="text-[#B985FF]">{userId}</span>
             </div>
             <div className="text-[15px]  leading-tight text-white/72">
               {t("app_version")}{" "}

@@ -26,8 +26,6 @@ try {
   }
 
   $env:TIKTOK_MINIS_BUILD = "1"
-  $env:NEXT_PUBLIC_FORCE_HLS_PROXY = "1"
-
   if (-not $env:NEXT_PUBLIC_MINCHAP_API_BASE_URL) {
     try {
       $Tunnels = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 2
@@ -85,7 +83,6 @@ if (window.TTMinis && window.__MINCHAP_TIKTOK_CLIENT_KEY__) {
 }
 finally {
   Remove-Item Env:\TIKTOK_MINIS_BUILD -ErrorAction SilentlyContinue
-  Remove-Item Env:\NEXT_PUBLIC_FORCE_HLS_PROXY -ErrorAction SilentlyContinue
 
   foreach ($Route in $DynamicRouteDirs) {
     if ((Test-Path -LiteralPath $Route.Hidden) -and -not (Test-Path -LiteralPath $Route.Source)) {

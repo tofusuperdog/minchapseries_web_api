@@ -93,6 +93,20 @@ const formatError = (error) => {
 const getRuntimeDetails = () =>
   `TTMinis exists=${Boolean(window.TTMinis)}, login type=${typeof window.TTMinis?.login}, SDK ready=${Boolean(window.__MINCHAP_TIKTOK_SDK_READY__)}, origin=${window.location?.origin || "-"}, api=${getApiUrl("") || "-"}`;
 
+const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
+
+function storeTikTokUser(user) {
+  if (typeof window === "undefined") return;
+
+  if (!user?.id) {
+    window.localStorage.removeItem(TIKTOK_USER_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(TIKTOK_USER_STORAGE_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event("minchap:tiktok-user-updated"));
+}
+
 export default function TikTokSilentLoginPopup() {
   const [isOpen, setIsOpen] = useState(false);
   const [state, setState] = useState({
@@ -114,6 +128,7 @@ export default function TikTokSilentLoginPopup() {
       if (!isMounted) return;
 
       if (!ttMinis) {
+        window.localStorage.removeItem(TIKTOK_USER_STORAGE_KEY);
         setState({
           status: "not_tiktok",
           title: "ไม่ได้มาจาก TikTok",
@@ -175,13 +190,15 @@ export default function TikTokSilentLoginPopup() {
           throw new Error(payload.error || `Backend login failed: ${response.status}`);
         }
 
+        storeTikTokUser(payload.user);
+
         if (!isMounted) return;
 
         setState({
           status: "success",
           title: "TikTok User Info",
           message: "Silent Login สำเร็จ",
-          details: "Backend token exchange completed.",
+          details: `Backend token exchange completed. ${getRuntimeDetails()}`,
           user: payload.user,
         });
       } catch (error) {
