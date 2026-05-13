@@ -13,7 +13,7 @@ export async function upsertTikTokCustomer(openId) {
 
   const response = await fetch(
     getSupabaseRestUrl(
-      "customers?on_conflict=tiktok_open_id&select=id,tiktok_open_id",
+      "customers?on_conflict=tiktok_open_id&select=id,tiktok_open_id,preferred_language",
     ),
     {
       method: "POST",
@@ -38,6 +38,76 @@ export async function upsertTikTokCustomer(openId) {
       payload?.message ||
         payload?.error ||
         "Failed to upsert Supabase customer",
+    );
+  }
+
+  return Array.isArray(payload) ? payload[0] || null : payload;
+}
+
+export async function updateTikTokCustomerLanguage({ customerId, openId, language }) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Supabase admin credentials are not configured");
+  }
+
+  const response = await fetch(
+    getSupabaseRestUrl(
+      `customers?id=eq.${encodeURIComponent(customerId)}&tiktok_open_id=eq.${encodeURIComponent(openId)}&select=id,tiktok_open_id,preferred_language`,
+    ),
+    {
+      method: "PATCH",
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        preferred_language: language,
+        updated_at: new Date().toISOString(),
+      }),
+      cache: "no-store",
+    },
+  );
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message ||
+        payload?.error ||
+        "Failed to update Supabase customer language",
+    );
+  }
+
+  return Array.isArray(payload) ? payload[0] || null : payload;
+}
+
+export async function getTikTokCustomerById({ customerId, openId }) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Supabase admin credentials are not configured");
+  }
+
+  const response = await fetch(
+    getSupabaseRestUrl(
+      `customers?id=eq.${encodeURIComponent(customerId)}&tiktok_open_id=eq.${encodeURIComponent(openId)}&select=id,tiktok_open_id,preferred_language&limit=1`,
+    ),
+    {
+      method: "GET",
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message ||
+        payload?.error ||
+        "Failed to fetch Supabase customer",
     );
   }
 

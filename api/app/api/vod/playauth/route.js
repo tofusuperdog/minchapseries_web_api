@@ -194,6 +194,13 @@ export async function GET(request) {
     );
   }
 
+  if (!/^[A-Za-z0-9_-]{6,128}$/.test(vid)) {
+    return NextResponse.json(
+      { error: "Invalid vid parameter" },
+      { status: 400, headers: withCorsHeaders(request) },
+    );
+  }
+
   const accessKeyId =
     process.env.BYTEPLUS_ACCESS_KEY_ID || process.env.AccessKeyId;
   const secretAccessKey =

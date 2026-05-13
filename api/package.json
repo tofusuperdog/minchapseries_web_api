@@ -9,8 +9,12 @@
   },
   "dependencies": {
     "@byteplus/vcloud-sdk-nodejs": "^1.0.7",
-    "next": "16.2.3",
+    "next": "16.2.6",
     "react": "19.1.0",
     "react-dom": "19.1.0"
+  },
+  "overrides": {
+    "axios": "1.16.0",
+    "postcss": "8.5.14"
   }
 }

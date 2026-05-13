@@ -23,6 +23,20 @@ function readStoredCustomerId() {
   }
 }
 
+function readStoredCustomerAuthToken() {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const storedUser = JSON.parse(
+      window.localStorage.getItem(TIKTOK_USER_STORAGE_KEY) || "null",
+    );
+
+    return storedUser?.customer_auth_token || "";
+  } catch {
+    return "";
+  }
+}
+
 export default function ContactPage() {
   const { t, language, changeLanguage } = useLanguage();
   const router = useRouter();
@@ -55,6 +69,7 @@ export default function ContactPage() {
         body: JSON.stringify({
           ...form,
           customerId: readStoredCustomerId(),
+          customerAuthToken: readStoredCustomerAuthToken(),
           locale: language,
           source: "tiktok-mini",
         }),

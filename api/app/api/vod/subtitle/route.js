@@ -9,7 +9,7 @@ const ALLOWED_HOST_SUFFIXES = [
 ];
 
 function isAllowedSubtitleUrl(url) {
-  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  if (url.protocol !== "https:") return false;
 
   return ALLOWED_HOST_SUFFIXES.some(
     (suffix) => url.hostname === suffix || url.hostname.endsWith(`.${suffix}`),

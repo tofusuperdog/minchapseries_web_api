@@ -25,7 +25,6 @@ function getAllowedOrigins() {
 }
 
 function isOriginAllowed(origin, allowedOrigins) {
-  if (allowedOrigins.includes("*")) return true;
   if (allowedOrigins.includes(origin)) return true;
 
   return allowedOrigins

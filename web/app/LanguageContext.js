@@ -333,17 +333,55 @@ export const translations = {
   }
 };
 
+const DEFAULT_LANGUAGE = "TH";
+const FALLBACK_DETECTED_LANGUAGE = "EN";
+const LANGUAGE_STORAGE_KEY = "minchap_lang";
+
+const localeLanguageMap = [
+  ["th", "TH"],
+  ["ja", "JP"],
+  ["jp", "JP"],
+  ["zh", "CN"],
+  ["cn", "CN"],
+  ["en", "EN"],
+];
+
+export function detectDeviceLanguage() {
+  if (typeof navigator === "undefined") {
+    return DEFAULT_LANGUAGE;
+  }
+
+  const locales =
+    Array.isArray(navigator.languages) && navigator.languages.length > 0
+      ? navigator.languages
+      : [navigator.language];
+
+  for (const locale of locales) {
+    const normalized = String(locale || "").trim().toLowerCase();
+    const match = localeLanguageMap.find(([prefix]) =>
+      normalized === prefix || normalized.startsWith(`${prefix}-`)
+    );
+
+    if (match && translations[match[1]]) {
+      return match[1];
+    }
+  }
+
+  return FALLBACK_DETECTED_LANGUAGE;
+}
+
 const LanguageContext = createContext();
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState("TH");
+  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Load from localStorage on mount
-    const saved = localStorage.getItem("minchap_lang");
+    const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (saved && translations[saved]) {
       setLanguage(saved);
+    } else {
+      setLanguage(detectDeviceLanguage());
     }
     setMounted(true);
   }, []);
@@ -351,13 +389,13 @@ export function LanguageProvider({ children }) {
   const changeLanguage = (lang) => {
     if (translations[lang]) {
       setLanguage(lang);
-      localStorage.setItem("minchap_lang", lang);
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
     }
   };
 
   const t = (key) => {
     // Fallback to TH if key doesn't exist in selected language
-    return translations[language][key] || translations["TH"][key] || key;
+    return translations[language]?.[key] || translations[DEFAULT_LANGUAGE]?.[key] || key;
   };
 
   if (!mounted) {

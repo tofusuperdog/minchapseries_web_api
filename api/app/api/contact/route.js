@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { corsOptionsResponse, withCorsHeaders } from "../../lib/cors";
-import { createContactMessage } from "../../lib/supabaseAdmin";
+import { verifyCustomerAuthToken } from "../../lib/customerAuthToken";
+import { createContactMessage, getTikTokCustomerById } from "../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export async function POST(request) {
   const message = String(body?.message || "").trim();
   const locale = String(body?.locale || "").trim();
   const source = String(body?.source || "web").trim();
+  const customerAuthToken = String(body?.customerAuthToken || "").trim();
   const rawCustomerId = body?.customerId;
   const customerId =
     rawCustomerId === null || rawCustomerId === undefined || rawCustomerId === ""
@@ -55,8 +57,29 @@ export async function POST(request) {
   }
 
   try {
+    let verifiedCustomerId = null;
+
+    if (customerId !== null) {
+      const tokenPayload = verifyCustomerAuthToken(customerAuthToken);
+
+      if (!tokenPayload || Number(tokenPayload.customerId) !== customerId) {
+        return json(request, { error: "Invalid customer token" }, { status: 401 });
+      }
+
+      const customer = await getTikTokCustomerById({
+        customerId: tokenPayload.customerId,
+        openId: tokenPayload.openId,
+      });
+
+      if (!customer) {
+        return json(request, { error: "Customer not found" }, { status: 404 });
+      }
+
+      verifiedCustomerId = customer.id;
+    }
+
     const contactMessage = await createContactMessage({
-      customerId,
+      customerId: verifiedCustomerId,
       name,
       email,
       message,

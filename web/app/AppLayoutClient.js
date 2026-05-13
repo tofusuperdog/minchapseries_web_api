@@ -2,12 +2,37 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LanguageProvider, useLanguage } from "./LanguageContext";
-import { useState, useRef } from "react";
+import { LanguageProvider, detectDeviceLanguage, useLanguage } from "./LanguageContext";
+import { useEffect, useState, useRef } from "react";
 import MagicTrail from "./MagicTrail";
 import { useClickOutside } from "./hooks/useClickOutside";
+import { getApiUrl } from "./lib/apiBaseUrl";
 
 const LANGUAGES = ["TH", "EN", "JP", "CN"];
+const LANGUAGE_LABELS = {
+  TH: "ไทย",
+  EN: "English",
+  JP: "日本語",
+  CN: "中文",
+};
+const LANGUAGE_SHEET_COPY = {
+  TH: {
+    title: "เลือกภาษาเริ่มต้น",
+    description: "เลือกภาษาที่ต้องการใช้ใน MinChap",
+  },
+  EN: {
+    title: "Choose app language",
+    description: "Select the language you want to use in MinChap.",
+  },
+  JP: {
+    title: "アプリの言語を選択",
+    description: "MinChapで使用する言語を選択してください。",
+  },
+  CN: {
+    title: "选择应用语言",
+    description: "选择你想在 MinChap 中使用的语言。",
+  },
+};
 const HEADER_HIDDEN_PATHS = new Set([
   "/vip",
   "/contact",
@@ -66,12 +91,120 @@ function ShareModal({ isOpen, onClose, t }) {
   );
 }
 
+function getLanguageSheetOptions() {
+  const detectedLanguage = detectDeviceLanguage();
+  if (detectedLanguage === "EN") return ["EN"];
+  if (LANGUAGES.includes(detectedLanguage)) return [detectedLanguage, "EN"];
+  return ["EN"];
+}
+
+function LanguageBottomSheet({
+  isOpen,
+  mode,
+  customerId,
+  openId,
+  customerAuthToken,
+  onClose,
+}) {
+  const { language, changeLanguage } = useLanguage();
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+  const options = getLanguageSheetOptions();
+  const copy = LANGUAGE_SHEET_COPY[language] || LANGUAGE_SHEET_COPY.EN;
+
+  const handleChooseLanguage = async (lang) => {
+    changeLanguage(lang);
+    setError("");
+
+    if (mode !== "tiktok") {
+      onClose();
+      return;
+    }
+
+    if (!customerId || !openId || !customerAuthToken) {
+      setError("Unable to save language.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(getApiUrl("/api/tiktok/customer-language"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId,
+          openId,
+          customerAuthToken,
+          language: lang,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to save language.");
+      }
+
+      const storedUser = window.localStorage.getItem("minchap_tiktok_user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        window.localStorage.setItem(
+          "minchap_tiktok_user",
+          JSON.stringify({ ...user, preferred_language: lang }),
+        );
+        window.dispatchEvent(new Event("minchap:tiktok-user-updated"));
+      }
+
+      onClose();
+    } catch (saveError) {
+      setError(saveError?.message || "Unable to save language.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9998] flex items-end bg-black/60 sm:hidden">
+      <div className="w-full rounded-t-2xl border border-white/10 bg-[#111111] px-5 pb-8 pt-5 shadow-2xl">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
+        <h2 className="text-xl font-semibold text-white">{copy.title}</h2>
+        <p className="mt-2 text-sm leading-5 text-white/60">{copy.description}</p>
+
+        <div className="mt-5 space-y-3">
+          {options.map((lang) => (
+            <button
+              key={lang}
+              type="button"
+              disabled={isSaving}
+              onClick={() => handleChooseLanguage(lang)}
+              className="flex h-12 w-full items-center justify-between rounded-lg border border-white/10 bg-white/10 px-4 text-left text-base font-semibold text-white transition-colors hover:bg-white/15 disabled:opacity-60"
+            >
+              <span>{LANGUAGE_LABELS[lang]}</span>
+              <span className="text-sm text-white/50">{lang}</span>
+            </button>
+          ))}
+        </div>
+
+        {error ? <p className="mt-3 text-sm text-[#ff6b81]">{error}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function LayoutContent({ children }) {
   const { language, changeLanguage, t } = useLanguage();
   const pathname = usePathname();
   
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [languageSheet, setLanguageSheet] = useState({
+    isOpen: false,
+    mode: "guest",
+    customerId: null,
+    openId: null,
+    customerAuthToken: null,
+  });
   const dropdownRef = useRef(null);
 
   useClickOutside(dropdownRef, () => setIsDropdownOpen(false));
@@ -89,7 +222,51 @@ function LayoutContent({ children }) {
   const isGenrePage = pathname.startsWith("/genre");
   const isVipPage = pathname === "/vip";
   const isProfileSectionPage = PROFILE_SECTION_PATHS.has(pathname);
-  const showHeader = !HEADER_HIDDEN_PATHS.has(pathname) && !isDetailPage(pathname);
+  const showHeader = pathname !== "/" && !HEADER_HIDDEN_PATHS.has(pathname) && !isDetailPage(pathname);
+
+  useEffect(() => {
+    const handleTikTokLoginState = (event) => {
+      const { status, user } = event.detail || {};
+
+      if (status === "not_tiktok") {
+        setLanguageSheet({
+          isOpen: true,
+          mode: "guest",
+          customerId: null,
+          openId: null,
+          customerAuthToken: null,
+        });
+        return;
+      }
+
+      if (status === "success") {
+        if (user?.preferred_language && LANGUAGES.includes(user.preferred_language)) {
+          changeLanguage(user.preferred_language);
+          setLanguageSheet({
+            isOpen: false,
+            mode: "tiktok",
+            customerId: user.id || null,
+            openId: user.open_id || null,
+            customerAuthToken: user.customer_auth_token || null,
+          });
+          return;
+        }
+
+        setLanguageSheet({
+          isOpen: true,
+          mode: "tiktok",
+          customerId: user?.id || null,
+          openId: user?.open_id || null,
+          customerAuthToken: user?.customer_auth_token || null,
+        });
+      }
+    };
+
+    window.addEventListener("minchap:tiktok-login-state", handleTikTokLoginState);
+    return () => {
+      window.removeEventListener("minchap:tiktok-login-state", handleTikTokLoginState);
+    };
+  }, [changeLanguage]);
 
   return (
     <div className="relative flex min-h-screen bg-black">
@@ -208,6 +385,14 @@ function LayoutContent({ children }) {
 
       {/* Modals */}
       <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} t={t} />
+      <LanguageBottomSheet
+        isOpen={languageSheet.isOpen}
+        mode={languageSheet.mode}
+        customerId={languageSheet.customerId}
+        openId={languageSheet.openId}
+        customerAuthToken={languageSheet.customerAuthToken}
+        onClose={() => setLanguageSheet((current) => ({ ...current, isOpen: false }))}
+      />
 
       <MagicTrail />
     </div>

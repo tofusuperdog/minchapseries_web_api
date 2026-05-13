@@ -36,8 +36,8 @@ function safeCompareHex(a, b) {
 function verifyTikTokSignature({ bodyText, signatureHeader, clientSecret }) {
   if (!clientSecret) {
     return {
-      ok: true,
-      skipped: true,
+      ok: false,
+      skipped: false,
       reason: "TIKTOK_CLIENT_SECRET is not configured",
     };
   }
