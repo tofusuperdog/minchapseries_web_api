@@ -34,6 +34,9 @@ const LANGUAGE_SHEET_COPY = {
   },
 };
 const HEADER_HIDDEN_PATHS = new Set([
+  "/myseries",
+  "/search",
+  "/profile",
   "/vip",
   "/contact",
   "/policy",

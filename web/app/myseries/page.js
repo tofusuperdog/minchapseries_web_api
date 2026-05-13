@@ -13,7 +13,7 @@ export default function AppMySeries() {
   ];
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-130px)] bg-black text-white">
+    <div className="flex flex-col w-full h-[calc(100vh-70px)] bg-black text-white">
       
       {/* Tabs Header */}
       <div className="flex w-full border-b border-white/5 px-4 pt-2">
