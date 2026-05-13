@@ -17,7 +17,7 @@ function readStoredCustomerId() {
       window.localStorage.getItem(TIKTOK_USER_STORAGE_KEY) || "null",
     );
 
-    return storedUser?.id || null;
+    return storedUser?.is_dev_bypass ? null : storedUser?.id || null;
   } catch {
     return null;
   }
@@ -31,7 +31,7 @@ function readStoredCustomerAuthToken() {
       window.localStorage.getItem(TIKTOK_USER_STORAGE_KEY) || "null",
     );
 
-    return storedUser?.customer_auth_token || "";
+    return storedUser?.is_dev_bypass ? "" : storedUser?.customer_auth_token || "";
   } catch {
     return "";
   }

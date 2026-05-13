@@ -5,6 +5,31 @@ import { getApiUrl } from "./lib/apiBaseUrl";
 
 const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
 
+function shouldBypassTikTokAuth() {
+  return (
+    process.env.NODE_ENV === "development" &&
+    ["1", "true", "yes"].includes(
+      String(process.env.NEXT_PUBLIC_BYPASS_TIKTOK_AUTH || "").toLowerCase(),
+    )
+  );
+}
+
+function getDevBypassUser() {
+  return {
+    id: "dev-customer",
+    open_id: "dev-open-id",
+    customer_auth_token: "",
+    preferred_language:
+      window.localStorage.getItem("minchap_lang") ||
+      "TH",
+    scope: "dev-bypass",
+    token_type: "dev",
+    expires_in: null,
+    refresh_expires_in: null,
+    is_dev_bypass: true,
+  };
+}
+
 const waitForTikTokMinis = async () => {
   const maxAttempts = 20;
 
@@ -116,6 +141,14 @@ export default function TikTokSilentLoginPopup() {
     let isMounted = true;
 
     async function runSilentLogin() {
+      if (shouldBypassTikTokAuth()) {
+        const devUser = getDevBypassUser();
+
+        storeTikTokUser(devUser);
+        dispatchLoginState({ status: "success", user: devUser });
+        return;
+      }
+
       dispatchLoginState({ status: "checking" });
 
       const ttMinis = await waitForTikTokMinis();
