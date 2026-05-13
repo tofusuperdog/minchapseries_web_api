@@ -90,9 +90,9 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="flex flex-col w-full min-h-[calc(100vh-70px)] overflow-y-auto text-white bg-black pt-[60px]">
+    <div className="flex flex-col w-full min-h-[calc(100vh-70px)] overflow-y-auto text-white bg-black">
       {/* Header matching screenshot */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-[60px] items-center justify-between px-4 bg-black/80 backdrop-blur-md">
+      <header className="hidden">
         <button onClick={() => router.back()} className="p-1">
           <svg
             xmlns="http://www.w3.org/2000/svg"

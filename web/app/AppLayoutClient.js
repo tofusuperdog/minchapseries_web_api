@@ -2,18 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LanguageProvider, detectDeviceLanguage, useLanguage } from "./LanguageContext";
+import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { useEffect, useState, useRef } from "react";
 import MagicTrail from "./MagicTrail";
 import { useClickOutside } from "./hooks/useClickOutside";
 import { getApiUrl } from "./lib/apiBaseUrl";
 
-const LANGUAGES = ["TH", "EN", "JP", "CN"];
+const LANGUAGE_STORAGE_KEY = "minchap_lang";
+const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
+const LANGUAGES = ["TH", "EN", "CN", "JP"];
 const LANGUAGE_LABELS = {
   TH: "ไทย",
   EN: "English",
   JP: "日本語",
   CN: "中文",
+};
+const LANGUAGE_SHEET_LABELS = {
+  TH: "\u0e44\u0e17\u0e22",
+  EN: "English",
+  CN: "\u4e2d\u6587",
+  JP: "\u65e5\u672c\u8a9e",
 };
 const LANGUAGE_SHEET_COPY = {
   TH: {
@@ -95,10 +103,50 @@ function ShareModal({ isOpen, onClose, t }) {
 }
 
 function getLanguageSheetOptions() {
-  const detectedLanguage = detectDeviceLanguage();
-  if (detectedLanguage === "EN") return ["EN"];
-  if (LANGUAGES.includes(detectedLanguage)) return [detectedLanguage, "EN"];
-  return ["EN"];
+  return LANGUAGES;
+}
+
+function getStoredLanguagePreference() {
+  if (typeof window === "undefined") return "";
+
+  const savedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  if (LANGUAGES.includes(savedLanguage)) return savedLanguage;
+
+  try {
+    const storedUser = JSON.parse(
+      window.localStorage.getItem(TIKTOK_USER_STORAGE_KEY) || "null",
+    );
+    const userLanguage = storedUser?.preferred_language;
+
+    return LANGUAGES.includes(userLanguage) ? userLanguage : "";
+  } catch {
+    return "";
+  }
+}
+
+async function saveCustomerLanguage({
+  customerId,
+  openId,
+  customerAuthToken,
+  language,
+}) {
+  if (!customerId || !openId || !customerAuthToken || !language) return;
+
+  const response = await fetch(getApiUrl("/api/tiktok/customer-language"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      customerId,
+      openId,
+      customerAuthToken,
+      language,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Unable to save language.");
+  }
 }
 
 function LanguageBottomSheet({
@@ -113,7 +161,6 @@ function LanguageBottomSheet({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const options = getLanguageSheetOptions();
-  const copy = LANGUAGE_SHEET_COPY[language] || LANGUAGE_SHEET_COPY.EN;
 
   const handleChooseLanguage = async (lang) => {
     changeLanguage(lang);
@@ -131,21 +178,12 @@ function LanguageBottomSheet({
 
     setIsSaving(true);
     try {
-      const response = await fetch(getApiUrl("/api/tiktok/customer-language"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId,
-          openId,
-          customerAuthToken,
-          language: lang,
-        }),
+      await saveCustomerLanguage({
+        customerId,
+        openId,
+        customerAuthToken,
+        language: lang,
       });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Unable to save language.");
-      }
 
       const storedUser = window.localStorage.getItem("minchap_tiktok_user");
       if (storedUser) {
@@ -169,24 +207,40 @@ function LanguageBottomSheet({
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-end bg-black/60 sm:hidden">
-      <div className="w-full rounded-t-2xl border border-white/10 bg-[#111111] px-5 pb-8 pt-5 shadow-2xl">
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
-        <h2 className="text-xl font-semibold text-white">{copy.title}</h2>
-        <p className="mt-2 text-sm leading-5 text-white/60">{copy.description}</p>
+      <div className="w-full rounded-t-2xl border border-white/10 bg-[#111111] px-4 pb-8 pt-4 shadow-2xl">
+        <div className="overflow-hidden rounded-xl bg-[#1f1d23]">
+          {options.map((lang, index) => {
+            const isSelected = language === lang;
 
-        <div className="mt-5 space-y-3">
-          {options.map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              disabled={isSaving}
-              onClick={() => handleChooseLanguage(lang)}
-              className="flex h-12 w-full items-center justify-between rounded-lg border border-white/10 bg-white/10 px-4 text-left text-base font-semibold text-white transition-colors hover:bg-white/15 disabled:opacity-60"
-            >
-              <span>{LANGUAGE_LABELS[lang]}</span>
-              <span className="text-sm text-white/50">{lang}</span>
-            </button>
-          ))}
+            return (
+              <button
+                key={lang}
+                type="button"
+                disabled={isSaving}
+                onClick={() => handleChooseLanguage(lang)}
+                className={`flex h-14 w-full items-center justify-between px-4 text-left text-[16px] font-semibold transition-colors active:bg-white/10 disabled:opacity-60 ${
+                  index > 0 ? "border-t border-white/10" : ""
+                } ${isSelected ? "text-[#C77DFF]" : "text-white/90"}`}
+              >
+                <span>{LANGUAGE_SHEET_LABELS[lang]}</span>
+                {isSelected ? (
+                  <svg
+                    className="h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m20 6-11 11-5-5" />
+                  </svg>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
 
         {error ? <p className="mt-3 text-sm text-[#ff6b81]">{error}</p> : null}
@@ -231,6 +285,19 @@ function LayoutContent({ children }) {
     const handleTikTokLoginState = (event) => {
       const { status, user } = event.detail || {};
 
+      if (["checking", "logging_in", "exchanging"].includes(status)) {
+        if (!getStoredLanguagePreference()) {
+          setLanguageSheet({
+            isOpen: true,
+            mode: "guest",
+            customerId: null,
+            openId: null,
+            customerAuthToken: null,
+          });
+        }
+        return;
+      }
+
       if (status === "not_tiktok") {
         setLanguageSheet({
           isOpen: true,
@@ -252,6 +319,42 @@ function LayoutContent({ children }) {
             openId: user.open_id || null,
             customerAuthToken: user.customer_auth_token || null,
           });
+          return;
+        }
+
+        const savedLanguage = getStoredLanguagePreference();
+
+        if (savedLanguage) {
+          changeLanguage(savedLanguage);
+          setLanguageSheet({
+            isOpen: false,
+            mode: "tiktok",
+            customerId: user?.id || null,
+            openId: user?.open_id || null,
+            customerAuthToken: user?.customer_auth_token || null,
+          });
+
+          saveCustomerLanguage({
+            customerId: user?.id || null,
+            openId: user?.open_id || null,
+            customerAuthToken: user?.customer_auth_token || null,
+            language: savedLanguage,
+          })
+            .then(() => {
+              if (!user?.id) return;
+
+              window.localStorage.setItem(
+                TIKTOK_USER_STORAGE_KEY,
+                JSON.stringify({
+                  ...user,
+                  preferred_language: savedLanguage,
+                }),
+              );
+              window.dispatchEvent(new Event("minchap:tiktok-user-updated"));
+            })
+            .catch((error) => {
+              console.error("Failed to save early language selection:", error);
+            });
           return;
         }
 

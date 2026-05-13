@@ -327,8 +327,8 @@ export default function AppPolicy() {
   }, []);
 
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-black pt-[60px] text-white no-scrollbar">
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-[60px] items-center justify-between bg-black/80 px-4 backdrop-blur-md">
+    <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-black text-white no-scrollbar">
+      <header className="hidden">
         <button onClick={() => router.back()} className="p-1">
           <svg
             xmlns="http://www.w3.org/2000/svg"

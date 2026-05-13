@@ -6,6 +6,36 @@ import { useState, useEffect } from "react";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
 const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
+const LANGUAGE_OPTIONS = [
+  { code: "TH", label: "\u0e44\u0e17\u0e22" },
+  { code: "EN", label: "English" },
+  { code: "CN", label: "\u4e2d\u6587" },
+  { code: "JP", label: "\u65e5\u672c\u8a9e" },
+];
+const LANGUAGE_LABELS = LANGUAGE_OPTIONS.reduce((labels, option) => {
+  labels[option.code] = option.label;
+  return labels;
+}, {});
+
+function LanguageIcon() {
+  return (
+    <svg
+      className="h-[25px] w-[25px] text-[#B95CFF]"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" />
+    </svg>
+  );
+}
 
 function readStoredUserId() {
   if (typeof window === "undefined") return "-";
@@ -22,10 +52,11 @@ function readStoredUserId() {
 }
 
 export default function AppProfile() {
-  const { language, t } = useLanguage();
+  const { language, changeLanguage, t } = useLanguage();
   const [isVipActive, setIsVipActive] = useState(true);
   const [version, setVersion] = useState("1.01");
   const [userId, setUserId] = useState("-");
+  const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
 
   const headers = SUPABASE_HEADERS;
 
@@ -80,6 +111,13 @@ export default function AppProfile() {
       label: t("subscription_history"),
       icon: "/subscription-history.svg",
       path: "/bill",
+    },
+    {
+      id: "language",
+      label: t("language_menu"),
+      iconComponent: <LanguageIcon />,
+      value: LANGUAGE_LABELS[language] || language,
+      onClick: () => setIsLanguageSheetOpen(true),
     },
     { id: "faq", label: t("faq"), icon: "/faq.svg", path: "/faq" },
     { id: "terms", label: t("terms"), icon: "/term.svg", path: "/terms" },
@@ -179,22 +217,26 @@ export default function AppProfile() {
 
         {/* Menu List */}
         <div className="flex flex-col">
-          {menuItems.map((item, index) => (
-            <div key={item.id}>
-              <Link
-                href={item.path || "#"}
-                className="flex items-center w-full gap-5 py-4 text-left transition-colors group active:bg-white/5"
-              >
+          {menuItems.map((item, index) => {
+            const content = (
+              <>
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.055] shadow-[inset_0_0_16px_rgba(255,255,255,0.04)]">
-                  <img
-                    src={item.icon}
-                    alt={item.label}
-                    className="h-[25px] w-[25px] object-contain opacity-90"
-                  />
+                  {item.iconComponent || (
+                    <img
+                      src={item.icon}
+                      alt={item.label}
+                      className="h-[25px] w-[25px] object-contain opacity-90"
+                    />
+                  )}
                 </div>
                 <span className="min-w-0 flex-1 text-[18px]  text-white/92 group-active:text-white">
                   {item.label}
                 </span>
+                {item.value ? (
+                  <span className="shrink-0 text-[16px] font-medium text-[#C77DFF]">
+                    {item.value}
+                  </span>
+                ) : null}
                 <svg
                   className="w-6 h-6 shrink-0 text-white/60 group-active:text-white/80"
                   xmlns="http://www.w3.org/2000/svg"
@@ -207,15 +249,86 @@ export default function AppProfile() {
                 >
                   <path d="m9 18 6-6-6-6" />
                 </svg>
-              </Link>
+              </>
+            );
+
+            return (
+            <div key={item.id}>
+              {item.onClick ? (
+                <button
+                  type="button"
+                  onClick={item.onClick}
+                  className="group flex w-full items-center gap-5 py-4 text-left transition-colors active:bg-white/5"
+                >
+                  {content}
+                </button>
+              ) : (
+                <Link
+                  href={item.path || "#"}
+                  className="flex items-center w-full gap-5 py-4 text-left transition-colors group active:bg-white/5"
+                >
+                  {content}
+                </Link>
+              )}
 
               {index < menuItems.length - 1 && (
                 <div className="h-[1px] bg-[#2A2A2A]" />
               )}
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
+
+      {isLanguageSheetOpen ? (
+        <div className="fixed inset-0 z-[9998] flex items-end bg-black/60">
+          <button
+            type="button"
+            aria-label="Close language menu"
+            onClick={() => setIsLanguageSheetOpen(false)}
+            className="absolute inset-0"
+          />
+          <div className="relative w-full rounded-t-2xl border border-white/10 bg-[#121016] px-5 pb-8 pt-4 shadow-[0_-18px_48px_rgba(0,0,0,0.48)]">
+            <div className="mx-auto mb-5 h-1 w-11 rounded-full bg-white/22" />
+            <div className="overflow-hidden rounded-xl bg-white/[0.055]">
+              {LANGUAGE_OPTIONS.map((option, index) => {
+                const isSelected = language === option.code;
+
+                return (
+                  <button
+                    type="button"
+                    key={option.code}
+                    onClick={() => {
+                      changeLanguage(option.code);
+                      setIsLanguageSheetOpen(false);
+                    }}
+                    className={`flex h-14 w-full items-center justify-between px-4 text-left text-[17px] font-medium ${
+                      index > 0 ? "border-t border-white/10" : ""
+                    } ${isSelected ? "text-[#C77DFF]" : "text-white/90"}`}
+                  >
+                    <span>{option.label}</span>
+                    {isSelected ? (
+                      <svg
+                        className="h-5 w-5"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="m20 6-11 11-5-5" />
+                      </svg>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
