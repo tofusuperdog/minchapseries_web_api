@@ -34,7 +34,7 @@ export default function AppHome() {
 
         const seriesRes = await fetch(
           supabaseRestUrl(
-            `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=in.(${seriesIds.join(",")})`,
+            `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=in.(${seriesIds.join(",")})&status=eq.published`,
           ),
           { headers }
         );
@@ -110,7 +110,7 @@ export default function AppHome() {
               const lang = langsData[0];
               const sr = await fetch(
                 supabaseRestUrl(
-                  `series?select=id&dub_${lang.code}=eq.true&limit=30`,
+                  `series?select=id&dub_${lang.code}=eq.true&status=eq.published&limit=30`,
                 ),
                 { headers }
               );
@@ -160,7 +160,9 @@ export default function AppHome() {
         
         const genrePromises = genres.map(async (g) => {
           const srRes = await fetch(
-            supabaseRestUrl(`series?select=id&genre_ids=cs.{${g.id}}&limit=50`),
+            supabaseRestUrl(
+              `series?select=id&genre_ids=cs.{${g.id}}&status=eq.published&limit=50`,
+            ),
             { headers }
           );
           const sdata = await srRes.json();
@@ -193,7 +195,7 @@ export default function AppHome() {
         if (idsArr.length > 0) {
           const seriesRes = await fetch(
             supabaseRestUrl(
-              `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=in.(${idsArr.join(",")})`,
+              `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=in.(${idsArr.join(",")})&status=eq.published`,
             ),
             { headers }
           );

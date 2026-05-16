@@ -41,7 +41,7 @@ export default function AppSearch() {
         // 2) Fetch series details
         const seriesRes = await fetch(
           supabaseRestUrl(
-            `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=in.(${seriesIds.join(",")})`,
+            `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=in.(${seriesIds.join(",")})&status=eq.published`,
           ),
           { headers }
         );
@@ -98,7 +98,7 @@ export default function AppSearch() {
       try {
         const res = await fetch(
           supabaseRestUrl(
-            `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&or=(title_th.ilike.*${encodeURIComponent(query)}*,title_en.ilike.*${encodeURIComponent(query)}*,title_jp.ilike.*${encodeURIComponent(query)}*,title_cn.ilike.*${encodeURIComponent(query)}*)&limit=20`,
+            `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&status=eq.published&or=(title_th.ilike.*${encodeURIComponent(query)}*,title_en.ilike.*${encodeURIComponent(query)}*,title_jp.ilike.*${encodeURIComponent(query)}*,title_cn.ilike.*${encodeURIComponent(query)}*)&limit=20`,
           ),
           { headers }
         );

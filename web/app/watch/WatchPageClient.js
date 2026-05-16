@@ -11,6 +11,12 @@ import {
 import { useLanguage } from "../LanguageContext";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getApiUrl } from "../lib/apiBaseUrl";
+import {
+  isSeriesFavorite,
+  loadFavoriteSeriesStatus,
+  setSeriesFavorite,
+} from "../lib/favoriteSeries";
+import { saveRecentSeries } from "../lib/recentSeries";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
 const BYTEPLUS_LICENSE =
@@ -709,6 +715,9 @@ export default function WatchPage() {
   const [activeEpisodeRangeStart, setActiveEpisodeRangeStart] = useState(1);
   const [vipLockedEpisode, setVipLockedEpisode] = useState(null);
   const [playbackAlert, setPlaybackAlert] = useState(null);
+  const [currentSeries, setCurrentSeries] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavoriteSaving, setIsFavoriteSaving] = useState(false);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return undefined;
@@ -759,6 +768,23 @@ export default function WatchPage() {
     setSelectedSubtitleId(option.id);
     setActiveSubtitle(option.subtitle);
     subtitlePreferenceRef.current = getSubtitlePreference(option.subtitle);
+  };
+
+  const handleFavoriteToggle = async () => {
+    if (!currentSeries?.id || isFavoriteSaving) return;
+
+    const nextFavorite = !isFavorite;
+    setIsFavorite(nextFavorite);
+    setIsFavoriteSaving(true);
+
+    try {
+      await setSeriesFavorite(currentSeries, nextFavorite);
+    } catch (err) {
+      console.error("Failed to update favorite series:", err);
+      setIsFavorite(!nextFavorite);
+    } finally {
+      setIsFavoriteSaving(false);
+    }
   };
 
   const applyFetchedSubtitles = useCallback(
@@ -963,6 +989,8 @@ export default function WatchPage() {
       setActiveSubtitle(undefined);
       setEpisodes([]);
       setSeriesTitle("");
+      setCurrentSeries(null);
+      setIsFavorite(false);
       setActiveEpisodeRangeStart(1);
       setVipLockedEpisode(null);
 
@@ -976,7 +1004,7 @@ export default function WatchPage() {
           ),
           fetch(
             supabaseRestUrl(
-              `series?select=title_th,title_en,title_jp,title_cn&id=eq.${encodeURIComponent(seriesId)}&limit=1`,
+              `series?select=id,title_th,title_en,title_jp,title_cn,poster_url&id=eq.${encodeURIComponent(seriesId)}&limit=1`,
             ),
             { headers },
           ),
@@ -986,7 +1014,14 @@ export default function WatchPage() {
         const firstEpisode = episodeData?.[0] || null;
 
         setEpisodes(Array.isArray(episodeData) ? episodeData : []);
-        setSeriesTitle(getSeriesTitle(seriesData?.[0], language));
+        const fetchedSeries = seriesData?.[0] || null;
+        setCurrentSeries(fetchedSeries);
+        setSeriesTitle(getSeriesTitle(fetchedSeries, language));
+        setIsFavorite(isSeriesFavorite(fetchedSeries?.id));
+        saveRecentSeries(fetchedSeries);
+        loadFavoriteSeriesStatus(fetchedSeries?.id).then((favoriteStatus) => {
+          setIsFavorite(favoriteStatus);
+        });
         await loadEpisodeVideo(firstEpisode);
       } catch (err) {
         console.error("Failed to load player data:", err);
@@ -1034,15 +1069,20 @@ export default function WatchPage() {
         <div className="absolute bottom-[72px] right-4 z-20 flex flex-col items-center gap-5">
           <button
             type="button"
+            onClick={handleFavoriteToggle}
+            disabled={!currentSeries?.id || isFavoriteSaving}
             aria-label={labels.favorite}
-            className="flex h-9 w-9 items-center justify-center text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] active:scale-95"
+            aria-pressed={isFavorite}
+            className={`flex h-9 w-9 items-center justify-center drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] active:scale-95 ${
+              isFavorite ? "text-[#FF2D55]" : "text-white"
+            } ${isFavoriteSaving ? "opacity-70" : ""}`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="30"
               height="30"
               viewBox="0 0 24 24"
-              fill="none"
+              fill={isFavorite ? "currentColor" : "none"}
               stroke="currentColor"
               strokeWidth="1.6"
               strokeLinecap="round"

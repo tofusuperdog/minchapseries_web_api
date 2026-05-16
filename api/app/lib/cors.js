@@ -41,8 +41,9 @@ export function getCorsHeaders(request) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Range, Authorization",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Range, Authorization, X-Customer-Auth-Token",
     "Access-Control-Expose-Headers":
       "Content-Length, Content-Range, Accept-Ranges, X-Subtitle-Converted, X-Subtitle-Cue-Count, X-Subtitle-First-Cue-Ms, X-Subtitle-Offset-Ms",
     Vary: "Origin",
