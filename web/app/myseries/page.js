@@ -1,8 +1,8 @@
 "use client";
 
 import { useLanguage } from "../LanguageContext";
-import { getFavoriteSeries, loadFavoriteSeries } from "../lib/favoriteSeries";
-import { getRecentSeries, loadRecentSeries } from "../lib/recentSeries";
+import { loadFavoriteSeries } from "../lib/favoriteSeries";
+import { loadRecentSeries } from "../lib/recentSeries";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,6 +12,7 @@ export default function AppMySeries() {
   const [activeTab, setActiveTab] = useState("recent"); // recent or favorite
   const [recentSeries, setRecentSeries] = useState([]);
   const [favoriteSeries, setFavoriteSeries] = useState([]);
+  const [loadingSeries, setLoadingSeries] = useState(true);
 
   const tabs = [
     { id: "recent", label: t("recent_series") },
@@ -19,20 +20,38 @@ export default function AppMySeries() {
   ];
 
   useEffect(() => {
-    setRecentSeries(getRecentSeries());
-    setFavoriteSeries(getFavoriteSeries());
-    loadRecentSeries().then(setRecentSeries);
-    loadFavoriteSeries().then(setFavoriteSeries);
+    let cancelled = false;
 
-    const handleRecentSeriesUpdated = () => setRecentSeries(getRecentSeries());
-    const handleFavoriteSeriesUpdated = () =>
-      setFavoriteSeries(getFavoriteSeries());
-    const handleTikTokUserUpdated = () => {
-      setRecentSeries(getRecentSeries());
-      setFavoriteSeries(getFavoriteSeries());
-      loadRecentSeries().then(setRecentSeries);
-      loadFavoriteSeries().then(setFavoriteSeries);
+    const loadAuthoritativeSeries = async () => {
+      setLoadingSeries(true);
+
+      const [recentItems, favoriteItems] = await Promise.all([
+        loadRecentSeries({ fallbackToCache: false, syncLocal: false }),
+        loadFavoriteSeries({ fallbackToCache: false }),
+      ]);
+
+      if (cancelled) return;
+
+      setRecentSeries(recentItems);
+      setFavoriteSeries(favoriteItems);
+      setLoadingSeries(false);
     };
+
+    loadAuthoritativeSeries();
+
+    const handleRecentSeriesUpdated = () => {
+      loadRecentSeries({ fallbackToCache: false, syncLocal: false }).then(
+        (items) => {
+          if (!cancelled) setRecentSeries(items);
+        },
+      );
+    };
+    const handleFavoriteSeriesUpdated = () => {
+      loadFavoriteSeries({ fallbackToCache: false }).then((items) => {
+        if (!cancelled) setFavoriteSeries(items);
+      });
+    };
+    const handleTikTokUserUpdated = loadAuthoritativeSeries;
     const handleStoredSeriesUpdated = () => {
       handleRecentSeriesUpdated();
       handleFavoriteSeriesUpdated();
@@ -53,6 +72,7 @@ export default function AppMySeries() {
     );
 
     return () => {
+      cancelled = true;
       window.removeEventListener("storage", handleStoredSeriesUpdated);
       window.removeEventListener(
         "minchap_recent_series_updated",
@@ -112,7 +132,11 @@ export default function AppMySeries() {
       </div>
 
       {/* Content Area */}
-      {visibleSeries.length > 0 ? (
+      {loadingSeries ? (
+        <div className="flex flex-1 items-center justify-center py-16">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#BF8EFF] border-t-transparent" />
+        </div>
+      ) : visibleSeries.length > 0 ? (
         <div className="grid grid-cols-3 gap-2.5 p-4">
           {visibleSeries.map((series) => (
             <button

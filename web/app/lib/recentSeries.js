@@ -140,13 +140,18 @@ async function syncLocalRecentSeriesToDatabase() {
   }
 }
 
-export async function loadRecentSeries() {
+export async function loadRecentSeries({
+  fallbackToCache = true,
+  syncLocal = true,
+} = {}) {
   const customer = getStoredCustomer();
 
-  if (!customer) return getRecentSeries();
+  if (!customer) return fallbackToCache ? getRecentSeries() : [];
 
   try {
-    await syncLocalRecentSeriesToDatabase();
+    if (syncLocal) {
+      await syncLocalRecentSeriesToDatabase();
+    }
 
     const params = new URLSearchParams({
       customerId: String(customer.customerId),
@@ -169,6 +174,6 @@ export async function loadRecentSeries() {
     return setRecentSeries(payload.items || []);
   } catch (error) {
     console.error("Failed to load recent series:", error);
-    return getRecentSeries();
+    return fallbackToCache ? getRecentSeries() : [];
   }
 }

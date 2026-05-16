@@ -212,7 +212,7 @@ export async function getCustomerRecentSeries({ customerId }) {
 
   const response = await fetch(
     getSupabaseRestUrl(
-      `customer_recent_series?customer_id=eq.${encodeURIComponent(customerId)}&select=series_id,watched_at,series(id,title_th,title_en,title_jp,title_cn,poster_url)&order=watched_at.desc&limit=9`,
+      `customer_recent_series?customer_id=eq.${encodeURIComponent(customerId)}&select=series_id,watched_at,series!inner(id,title_th,title_en,title_jp,title_cn,poster_url,status)&series.status=eq.published&order=watched_at.desc&limit=9`,
     ),
     {
       method: "GET",
@@ -363,7 +363,7 @@ export async function getCustomerFavoriteSeries({ customerId }) {
 
   const response = await fetch(
     getSupabaseRestUrl(
-      `customer_favorite_series?customer_id=eq.${encodeURIComponent(customerId)}&select=series_id,favorited_at,series(id,title_th,title_en,title_jp,title_cn,poster_url)&order=favorited_at.desc&limit=9`,
+      `customer_favorite_series?customer_id=eq.${encodeURIComponent(customerId)}&select=series_id,favorited_at,series!inner(id,title_th,title_en,title_jp,title_cn,poster_url,status)&series.status=eq.published&order=favorited_at.desc&limit=9`,
     ),
     {
       method: "GET",

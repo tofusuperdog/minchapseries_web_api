@@ -145,10 +145,10 @@ export async function setSeriesFavorite(series, isFavorite) {
   return next;
 }
 
-export async function loadFavoriteSeries() {
+export async function loadFavoriteSeries({ fallbackToCache = true } = {}) {
   const customer = getStoredCustomer();
 
-  if (!customer) return getFavoriteSeries();
+  if (!customer) return fallbackToCache ? getFavoriteSeries() : [];
 
   try {
     const params = new URLSearchParams({
@@ -172,7 +172,7 @@ export async function loadFavoriteSeries() {
     return setFavoriteSeries(payload.items || []);
   } catch (error) {
     console.error("Failed to load favorite series:", error);
-    return getFavoriteSeries();
+    return fallbackToCache ? getFavoriteSeries() : [];
   }
 }
 
