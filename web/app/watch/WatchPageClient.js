@@ -738,6 +738,28 @@ export default function WatchPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const tiktokMinis = typeof window !== "undefined" ? window.TTMinis : null;
+
+    if (tiktokMinis?.disableCapture) {
+      try {
+        tiktokMinis.disableCapture();
+      } catch (err) {
+        console.error("Failed to disable screen capture:", err);
+      }
+    }
+
+    return () => {
+      if (tiktokMinis?.enableCapture) {
+        try {
+          tiktokMinis.enableCapture();
+        } catch (err) {
+          console.error("Failed to enable screen capture:", err);
+        }
+      }
+    };
+  }, []);
+
   const subtitleOptions = Array.isArray(subtitles)
     ? subtitles
         .filter(
