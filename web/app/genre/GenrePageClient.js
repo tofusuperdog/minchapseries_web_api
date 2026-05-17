@@ -1,14 +1,12 @@
 "use client";
 
 import { useLanguage } from "../LanguageContext";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
-import { useClickOutside } from "../hooks/useClickOutside";
 
 export default function GenreDetail() {
-  const { language, t, changeLanguage } = useLanguage();
+  const { language } = useLanguage();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -17,12 +15,8 @@ export default function GenreDetail() {
   const [category, setCategory] = useState(null);
   const [seriesList, setSeriesList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isLangOpen, setIsLangOpen] = useState(false);
-  const langDropdownRef = useRef(null);
 
   const headers = SUPABASE_HEADERS;
-
-  useClickOutside(langDropdownRef, () => setIsLangOpen(false));
 
   useEffect(() => {
     async function fetchData() {
@@ -91,57 +85,7 @@ export default function GenreDetail() {
   };
 
   return (
-    <div className="flex flex-col w-full min-h-screen bg-black text-white pb-10 pt-[60px]">
-      
-      {/* Header matching bill page */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-[60px] items-center justify-between px-4 bg-black/80 backdrop-blur-md">
-        <button onClick={() => router.back()} className="p-1 text-white/70 hover:text-white">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-
-        <div className="flex items-center">
-           <img src="/minchap.svg" alt="MinChap" className="h-6 w-auto object-contain" />
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Language Selection */}
-          <div className="relative" ref={langDropdownRef}>
-            <button 
-              onClick={() => setIsLangOpen(!isLangOpen)}
-              className="flex items-center gap-1 rounded bg-[#1A1A1A] px-2 py-1 text-xs font-semibold text-white/90 border border-white/10 uppercase"
-            >
-              {language}
-              <svg className={`h-3 w-3 transition-transform ${isLangOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-
-            {isLangOpen && (
-              <div className="absolute right-0 mt-2 w-20 rounded-lg bg-[#1A1A1A] shadow-lg border border-white/10 py-1 flex flex-col z-50">
-                {["TH", "EN", "JP", "CN"].map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => {
-                      changeLanguage(lang);
-                      setIsLangOpen(false);
-                    }}
-                    className={`px-4 py-2 text-sm text-left hover:bg-white/10 transition-colors ${language === lang ? 'text-white font-bold' : 'text-white/60'}`}
-                  >
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button className="flex items-center justify-center h-8 w-8 rounded text-white/90">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
-          </button>
-
-          <button onClick={() => router.push("/")} className="p-1 text-white/70 hover:text-white">
-             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-      </header>
-
+    <div className="flex flex-col w-full min-h-screen bg-black text-white pb-10">
       {/* Category Title */}
       <h1 className="text-[20px] font-bold text-center mt-6 mb-8">{getCategoryTitle(category)}</h1>
 
