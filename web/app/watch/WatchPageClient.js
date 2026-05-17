@@ -1043,29 +1043,6 @@ export default function WatchPage() {
       onContextMenu={(event) => event.preventDefault()}
     >
       {showPlayer && isVideoPaused && !vipLockedEpisode ? (
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label={labels.back}
-          className="absolute z-20 flex items-center justify-center w-10 h-10 text-white rounded-full left-4 top-4 bg-black/55 backdrop-blur-md active:scale-95"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-      ) : null}
-
-      {showPlayer && isVideoPaused && !vipLockedEpisode ? (
         <div className="absolute bottom-[72px] right-4 z-20 flex flex-col items-center gap-5">
           <button
             type="button"
