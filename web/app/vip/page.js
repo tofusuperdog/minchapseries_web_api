@@ -4,6 +4,7 @@ import { useLanguage } from "../LanguageContext";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
+  confirmTikTokVipPaymentOrder,
   createTikTokVipPaymentOrder,
   waitForActiveVipSubscription,
 } from "../lib/customerVip";
@@ -203,16 +204,30 @@ export default function VipPage() {
         order?.data?.trade_order_id ||
         order?.tradeOrderId ||
         "";
+      const paymentOrderToken =
+        order?.payment_order_token || order?.paymentOrderToken || "";
 
       if (!tradeOrderId) {
         throw new Error("TikTok payment order id is missing.");
+      }
+      if (!paymentOrderToken) {
+        throw new Error("TikTok payment confirmation token is missing.");
       }
 
       setPaymentMessage("Opening TikTok payment...");
       await payWithTikTokMinis(tradeOrderId);
 
       setPaymentMessage("Payment received. Activating VIP...");
-      const subscriptionPayload = await waitForActiveVipSubscription();
+      let subscriptionPayload = await confirmTikTokVipPaymentOrder({
+        paymentOrderToken,
+      });
+
+      if (!subscriptionPayload?.subscription?.is_active) {
+        subscriptionPayload = await waitForActiveVipSubscription({
+          attempts: 8,
+          delayMs: 1500,
+        });
+      }
 
       if (!subscriptionPayload?.subscription?.is_active) {
         setPaymentMessage("Payment is processing. Please check your VIP status shortly.");

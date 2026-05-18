@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { corsOptionsResponse, withCorsHeaders } from "../../../lib/cors";
 import { verifyCustomerAuthToken } from "../../../lib/customerAuthToken";
 import { getVipPackageById } from "../../../lib/supabaseAdmin";
+import { createTikTokPaymentOrderToken } from "../../../lib/tiktokPaymentOrderToken";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -162,6 +163,14 @@ export async function POST(request) {
       ok: true,
       order_id: orderId,
       trade_order_id: payload.data.trade_order_id,
+      payment_order_token: createTikTokPaymentOrderToken({
+        customerId: verified.customerId,
+        openId: verified.openId,
+        packageId,
+        orderId,
+        tradeOrderId: payload.data.trade_order_id,
+        tokenAmount,
+      }),
       package_id: packageId,
       token_amount: tokenAmount,
     });

@@ -265,6 +265,68 @@ export async function createTikTokVipPaymentOrder(packageId) {
   return payload;
 }
 
+export async function confirmTikTokVipPaymentOrder({
+  paymentOrderToken,
+  attempts = 12,
+  delayMs = 1500,
+} = {}) {
+  let customer = getStoredCustomer();
+  if (!customer) {
+    throw new Error("Please sign in before subscribing VIP.");
+  }
+
+  if (!customer.tiktokAccessToken) {
+    customer = await refreshTikTokCustomerSession();
+  }
+
+  if (!customer?.tiktokAccessToken) {
+    throw new Error("Please sign in again before confirming TikTok payment.");
+  }
+
+  if (!paymentOrderToken) {
+    throw new Error("TikTok payment confirmation token is missing.");
+  }
+
+  let lastPayload = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const response = await fetch(getApiUrl("/api/tiktok-minis/payment-confirm"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-customer-auth-token": customer.customerAuthToken,
+      },
+      body: JSON.stringify({
+        customerId: customer.customerId,
+        openId: customer.openId,
+        tiktokAccessToken: customer.tiktokAccessToken,
+        paymentOrderToken,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Unable to confirm TikTok payment.");
+    }
+
+    lastPayload = payload;
+
+    if (isVipSubscriptionActive(payload.subscription)) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(CUSTOMER_VIP_UPDATED_EVENT, { detail: payload }),
+        );
+      }
+
+      return payload;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  return lastPayload || { is_active: false, subscription: null };
+}
+
 export async function waitForActiveVipSubscription({
   attempts = 20,
   delayMs = 1500,
