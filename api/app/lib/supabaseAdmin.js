@@ -6,6 +6,20 @@ function getSupabaseRestUrl(path) {
   return `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/${path}`;
 }
 
+function getServiceRoleHeaders(extraHeaders = {}) {
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    ...extraHeaders,
+  };
+}
+
+function requireSupabaseAdmin() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Supabase admin credentials are not configured");
+  }
+}
+
 export async function upsertTikTokCustomer(openId) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return null;
@@ -42,6 +56,144 @@ export async function upsertTikTokCustomer(openId) {
   }
 
   return Array.isArray(payload) ? payload[0] || null : payload;
+}
+
+function normalizeVipSubscription(item) {
+  if (!item) return null;
+
+  return {
+    id: item.id,
+    customer_id: item.customer_id,
+    vip_package_id: item.vip_package_id,
+    package_type: item.package_type,
+    duration_days: item.duration_days,
+    bean_amount: item.bean_amount,
+    starts_at: item.starts_at,
+    expires_at: item.expires_at,
+    status: item.status,
+    is_active:
+      item.status === "active" && new Date(item.expires_at).getTime() > Date.now(),
+  };
+}
+
+export async function getActiveCustomerVipSubscription({ customerId }) {
+  requireSupabaseAdmin();
+
+  const response = await fetch(
+    getSupabaseRestUrl(
+      `customer_vip_subscriptions?customer_id=eq.${encodeURIComponent(customerId)}&status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=id,customer_id,vip_package_id,package_type,duration_days,bean_amount,starts_at,expires_at,status&order=expires_at.desc&limit=1`,
+    ),
+    {
+      method: "GET",
+      headers: getServiceRoleHeaders(),
+      cache: "no-store",
+    },
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message ||
+        payload?.error ||
+        "Failed to fetch active VIP subscription",
+    );
+  }
+
+  return normalizeVipSubscription(Array.isArray(payload) ? payload[0] : null);
+}
+
+export async function getVipPackageById(packageId) {
+  requireSupabaseAdmin();
+
+  const response = await fetch(
+    getSupabaseRestUrl(
+      `vip_package?id=eq.${encodeURIComponent(packageId)}&select=id,type,bean_amount,duration_days,price_thb,sort_order&limit=1`,
+    ),
+    {
+      method: "GET",
+      headers: getServiceRoleHeaders(),
+      cache: "no-store",
+    },
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message || payload?.error || "Failed to fetch VIP package",
+    );
+  }
+
+  return Array.isArray(payload) ? payload[0] || null : null;
+}
+
+export async function activateCustomerVipSubscription({
+  customerId,
+  packageId,
+  source,
+  sourceOrderId,
+  sourceTradeOrderId,
+  metadata,
+}) {
+  requireSupabaseAdmin();
+
+  const vipPackage = await getVipPackageById(packageId);
+  if (!vipPackage) {
+    throw new Error("VIP package was not found");
+  }
+
+  const activeSubscription = await getActiveCustomerVipSubscription({
+    customerId,
+  });
+  const now = new Date();
+  const currentExpiry = activeSubscription?.expires_at
+    ? new Date(activeSubscription.expires_at)
+    : null;
+  const startsAt =
+    currentExpiry && currentExpiry.getTime() > now.getTime()
+      ? currentExpiry
+      : now;
+  const durationDays = Number(vipPackage.duration_days || 7);
+  const expiresAt = new Date(startsAt.getTime() + durationDays * 86400000);
+  const beanAmount = Number(
+    vipPackage.bean_amount ?? vipPackage.price_thb ?? 0,
+  );
+
+  const response = await fetch(
+    getSupabaseRestUrl("customer_vip_subscriptions?select=id,customer_id,vip_package_id,package_type,duration_days,bean_amount,starts_at,expires_at,status"),
+    {
+      method: "POST",
+      headers: getServiceRoleHeaders({
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      }),
+      body: JSON.stringify({
+        customer_id: customerId,
+        vip_package_id: vipPackage.id,
+        package_type: vipPackage.type,
+        duration_days: durationDays,
+        bean_amount: beanAmount,
+        starts_at: startsAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        status: "active",
+        source: source || "tiktok_minis",
+        source_order_id: sourceOrderId || null,
+        source_trade_order_id: sourceTradeOrderId || null,
+        metadata: metadata || {},
+      }),
+      cache: "no-store",
+    },
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message ||
+        payload?.error ||
+        "Failed to activate VIP subscription",
+    );
+  }
+
+  return normalizeVipSubscription(Array.isArray(payload) ? payload[0] : payload);
 }
 
 export async function updateTikTokCustomerLanguage({ customerId, openId, language }) {

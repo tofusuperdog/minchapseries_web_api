@@ -3,6 +3,11 @@
 import { useLanguage } from "../LanguageContext";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import {
+  CUSTOMER_VIP_UPDATED_EVENT,
+  isVipSubscriptionActive,
+  loadCustomerVipSubscription,
+} from "../lib/customerVip";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
 const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
@@ -56,6 +61,7 @@ export default function AppProfile() {
   const [isVipActive, setIsVipActive] = useState(true);
   const [version, setVersion] = useState("1.01");
   const [userId, setUserId] = useState("-");
+  const [vipSubscription, setVipSubscription] = useState(null);
   const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
 
   const headers = SUPABASE_HEADERS;
@@ -63,14 +69,22 @@ export default function AppProfile() {
   useEffect(() => {
     setUserId(readStoredUserId());
 
-    const updateUserId = () => setUserId(readStoredUserId());
+    const updateUserId = () => {
+      setUserId(readStoredUserId());
+      loadCustomerVipSubscription()
+        .then((payload) => setVipSubscription(payload.subscription || null))
+        .catch(() => setVipSubscription(null));
+    };
 
     window.addEventListener("storage", updateUserId);
     window.addEventListener("minchap:tiktok-user-updated", updateUserId);
+    window.addEventListener(CUSTOMER_VIP_UPDATED_EVENT, updateUserId);
+    updateUserId();
 
     return () => {
       window.removeEventListener("storage", updateUserId);
       window.removeEventListener("minchap:tiktok-user-updated", updateUserId);
+      window.removeEventListener(CUSTOMER_VIP_UPDATED_EVENT, updateUserId);
     };
   }, []);
 
@@ -104,6 +118,19 @@ export default function AppProfile() {
     }
     fetchData();
   }, []);
+
+  const activeVipSubscription = isVipSubscriptionActive(vipSubscription)
+    ? vipSubscription
+    : null;
+  const formatVipExpiry = (value) => {
+    if (!value) return "";
+
+    return new Intl.DateTimeFormat(language === "TH" ? "th-TH" : "en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(value));
+  };
 
   const menuItems = [
     {
@@ -186,8 +213,15 @@ export default function AppProfile() {
                   </span>
                 </h3>
                 <p className="text-[17px] leading-tight text-white/86">
-                  {t("unlimited_watch")}
+                  {activeVipSubscription
+                    ? activeVipSubscription.package_type
+                    : t("unlimited_watch")}
                 </p>
+                {activeVipSubscription ? (
+                  <p className="mt-1 text-[13px] leading-tight text-white/62">
+                    Expires {formatVipExpiry(activeVipSubscription.expires_at)}
+                  </p>
+                ) : null}
                 <Link
                   href="/vip"
                   className={`mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[12px] bg-gradient-to-b from-[#B24BFF] to-[#7800D7] px-5 font-extrabold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_20px_rgba(143,42,255,0.38)] transition-transform active:scale-[0.98] ${
@@ -196,7 +230,9 @@ export default function AppProfile() {
                       : "max-w-[160px] text-[17px]"
                   }`}
                 >
-                  {t("subscribe_vip")}
+                  {activeVipSubscription
+                    ? activeVipSubscription.package_type
+                    : t("subscribe_vip")}
                   <svg
                     className="w-5 h-5"
                     xmlns="http://www.w3.org/2000/svg"

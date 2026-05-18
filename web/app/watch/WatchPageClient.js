@@ -12,6 +12,11 @@ import { useLanguage } from "../LanguageContext";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getApiUrl } from "../lib/apiBaseUrl";
 import {
+  CUSTOMER_VIP_UPDATED_EVENT,
+  isVipSubscriptionActive,
+  loadCustomerVipSubscription,
+} from "../lib/customerVip";
+import {
   isSeriesFavorite,
   loadFavoriteSeriesStatus,
   setSeriesFavorite,
@@ -718,6 +723,7 @@ export default function WatchPage() {
   const [currentSeries, setCurrentSeries] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteSaving, setIsFavoriteSaving] = useState(false);
+  const [hasActiveVip, setHasActiveVip] = useState(false);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return undefined;
@@ -735,6 +741,34 @@ export default function WatchPage() {
       if (console.error === patchedConsoleError) {
         console.error = originalConsoleError;
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshVipStatus = () => {
+      loadCustomerVipSubscription()
+        .then((payload) => {
+          if (!cancelled) {
+            setHasActiveVip(isVipSubscriptionActive(payload.subscription));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setHasActiveVip(false);
+        });
+    };
+
+    refreshVipStatus();
+    window.addEventListener("storage", refreshVipStatus);
+    window.addEventListener("minchap:tiktok-user-updated", refreshVipStatus);
+    window.addEventListener(CUSTOMER_VIP_UPDATED_EVENT, refreshVipStatus);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", refreshVipStatus);
+      window.removeEventListener("minchap:tiktok-user-updated", refreshVipStatus);
+      window.removeEventListener(CUSTOMER_VIP_UPDATED_EVENT, refreshVipStatus);
     };
   }, []);
 
@@ -910,7 +944,7 @@ export default function WatchPage() {
       return;
     }
 
-    if (targetEpisode.is_free === false) {
+    if (targetEpisode.is_free === false && !hasActiveVip) {
       setVipLockedEpisode(targetEpisode);
       setIsEpisodeMenuOpen(false);
       setIsSubtitleMenuOpen(false);
@@ -935,6 +969,34 @@ export default function WatchPage() {
   };
 
   useEffect(() => {
+    if (!hasActiveVip || !vipLockedEpisode) return;
+
+    let cancelled = false;
+
+    async function unlockCurrentVipEpisode() {
+      setIsEpisodeLoading(true);
+      try {
+        await loadEpisodeVideo(vipLockedEpisode);
+        if (!cancelled) {
+          setVipLockedEpisode(null);
+          setIsVideoPaused(false);
+        }
+      } catch (err) {
+        console.error("Failed to unlock VIP episode:", err);
+        if (!cancelled) setError(labels.tokenError);
+      } finally {
+        if (!cancelled) setIsEpisodeLoading(false);
+      }
+    }
+
+    unlockCurrentVipEpisode();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasActiveVip, labels.tokenError, loadEpisodeVideo, vipLockedEpisode]);
+
+  useEffect(() => {
     if (!isVideoPaused) {
       setIsSubtitleMenuOpen(false);
       setIsEpisodeMenuOpen(false);
@@ -955,7 +1017,7 @@ export default function WatchPage() {
     setIsEpisodeMenuOpen(false);
     setIsSubtitleMenuOpen(false);
 
-    if (nextEpisode.is_free === false) {
+    if (nextEpisode.is_free === false && !hasActiveVip) {
       setVipLockedEpisode(nextEpisode);
       setIsVideoPaused(true);
       return;
@@ -976,6 +1038,7 @@ export default function WatchPage() {
     episode,
     episodes,
     isEpisodeLoading,
+    hasActiveVip,
     labels.tokenError,
     loadEpisodeVideo,
   ]);
@@ -1017,7 +1080,7 @@ export default function WatchPage() {
       setVipLockedEpisode(null);
 
       try {
-        const [episodeResponse, seriesResponse] = await Promise.all([
+        const [episodeResponse, seriesResponse, vipStatusPayload] = await Promise.all([
           fetch(
             supabaseRestUrl(
               `episode?select=id,series_id,episode_no,video_url,is_free&series_id=eq.${encodeURIComponent(seriesId)}&order=episode_no.asc`,
@@ -1030,11 +1093,19 @@ export default function WatchPage() {
             ),
             { headers },
           ),
+          loadCustomerVipSubscription().catch(() => ({
+            is_active: false,
+            subscription: null,
+          })),
         ]);
         const episodeData = await episodeResponse.json();
         const seriesData = await seriesResponse.json();
         const firstEpisode = episodeData?.[0] || null;
+        const latestHasActiveVip = isVipSubscriptionActive(
+          vipStatusPayload?.subscription,
+        );
 
+        setHasActiveVip(latestHasActiveVip);
         setEpisodes(Array.isArray(episodeData) ? episodeData : []);
         const fetchedSeries = seriesData?.[0] || null;
         setCurrentSeries(fetchedSeries);
@@ -1044,7 +1115,13 @@ export default function WatchPage() {
         loadFavoriteSeriesStatus(fetchedSeries?.id).then((favoriteStatus) => {
           setIsFavorite(favoriteStatus);
         });
-        await loadEpisodeVideo(firstEpisode);
+        if (firstEpisode?.is_free === false && !latestHasActiveVip) {
+          setEpisode(firstEpisode);
+          setVipLockedEpisode(firstEpisode);
+          setIsVideoPaused(true);
+        } else {
+          await loadEpisodeVideo(firstEpisode);
+        }
       } catch (err) {
         console.error("Failed to load player data:", err);
         setError(labels.tokenError);
@@ -1183,7 +1260,7 @@ export default function WatchPage() {
                 const cellKey =
                   item?.id || `empty-${activeEpisodeRangeStart}-${index}`;
                 const isCurrent = item && episode?.id === item.id;
-                const isLocked = item?.is_free === false;
+                const isLocked = item?.is_free === false && !hasActiveVip;
 
                 if (!item) {
                   return (
@@ -1308,7 +1385,7 @@ export default function WatchPage() {
         </div>
       ) : null}
 
-      {showPlayer && vipLockedEpisode ? (
+      {vipLockedEpisode ? (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/62 px-4 backdrop-blur-[2px]">
           <div className="relative w-full max-w-[310px] overflow-hidden rounded-2xl border border-[#C15CFF] bg-[#12051F] px-5 pb-5 pt-5 text-white shadow-[0_0_30px_rgba(193,92,255,0.3)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(138,43,226,0.34),transparent_36%),radial-gradient(circle_at_88%_18%,rgba(193,92,255,0.2),transparent_24%)]" />

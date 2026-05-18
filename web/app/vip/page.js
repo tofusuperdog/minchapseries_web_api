@@ -2,6 +2,7 @@
 
 import { useLanguage } from "../LanguageContext";
 import { useState, useEffect } from "react";
+import { activateVipPackageForTest } from "../lib/customerVip";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
 export default function VipPage() {
@@ -10,6 +11,8 @@ export default function VipPage() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
 
   useEffect(() => {
     async function fetchPackages() {
@@ -58,23 +61,23 @@ export default function VipPage() {
     return t("unlimited_watch");
   };
 
-  // Get price and unit based on language
-  const getPriceInfo = (pkg) => {
-    switch (language) {
-      case "EN":
-        return { price: pkg.price_usd, unit: "USD" };
-      case "JP":
-        return { price: pkg.price_jpy, unit: "JPY" };
-      case "CN":
-        return { price: pkg.price_cny, unit: "CNY" };
-      default:
-        return { price: pkg.price_thb, unit: t("price_baht") };
-    }
+  // TikTok Minis payments use Beans as the payment unit.
+  const getBeanAmount = (pkg) => {
+    const value =
+      pkg.bean_amount ??
+      pkg.beans_amount ??
+      pkg.price_beans ??
+      pkg.price_bean ??
+      pkg.beans ??
+      pkg.price ??
+      pkg.price_thb;
+
+    return Number(value || 0);
   };
 
-  const getThaiPriceInfo = (pkg) => ({
-    price: pkg.price_thb,
-    unit: "บาท",
+  const getBeanPriceInfo = (pkg) => ({
+    price: getBeanAmount(pkg),
+    unit: "Beans",
   });
 
   const getThaiPackageTitle = (pkg) => {
@@ -96,16 +99,9 @@ export default function VipPage() {
     return pkg.type;
   };
 
-  const getPaymentNotice = (pkg) => {
-    const title = getThaiPackageTitle(pkg);
-    const { price, unit } = getThaiPriceInfo(pkg);
-
-    return `แพ็กเกจ ${title} ราคา ${price} ${unit}`;
-  };
-
   const getLocalizedPaymentNotice = (pkg) => {
     const title = getPackageTitle(pkg);
-    const { price, unit } = getPriceInfo(pkg);
+    const { price, unit } = getBeanPriceInfo(pkg);
 
     switch (language) {
       case "EN":
@@ -116,6 +112,23 @@ export default function VipPage() {
         return `套餐 ${title}: ${price} ${unit}`;
       default:
         return `แพ็กเกจ ${title} ราคา ${price} ${unit}`;
+    }
+  };
+
+  const handleVipPayment = async () => {
+    if (!selectedPackage || paymentLoading) return;
+
+    setPaymentLoading(true);
+    setPaymentMessage("");
+
+    try {
+      await activateVipPackageForTest(selectedPackage.id);
+      setPaymentMessage("VIP activated");
+      setSelectedPackage(null);
+    } catch (error) {
+      setPaymentMessage(error?.message || "Unable to activate VIP");
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
@@ -150,7 +163,7 @@ export default function VipPage() {
             </div>
           ) : (
             packages.map((pkg) => {
-              const { price, unit } = getPriceInfo(pkg);
+              const { price, unit } = getBeanPriceInfo(pkg);
               const title = getPackageTitle(pkg);
               const description = getPackageDescription(pkg);
 
@@ -158,7 +171,10 @@ export default function VipPage() {
                 <button
                   type="button"
                   key={pkg.id}
-                  onClick={() => setSelectedPackage(pkg)}
+                  onClick={() => {
+                    setPaymentMessage("");
+                    setSelectedPackage(pkg);
+                  }}
                   className={`relative w-full rounded-2xl p-5 overflow-hidden transition-all active:scale-95 scroll-mt-20 ${
                     pkg.is_recommended
                       ? "border border-[#C15BFF] bg-[radial-gradient(circle_at_36%_19%,rgba(235,188,255,0.16),transparent_18%),linear-gradient(115deg,#1B0A25_0%,#2F1544_48%,#16091F_100%)] shadow-[0_0_24px_rgba(178,55,255,0.26),inset_0_0_22px_rgba(199,91,255,0.13)]"
@@ -259,13 +275,24 @@ export default function VipPage() {
                   {t("payment_flow_label")} : vip_payment_flow
                 </p>
                 <p>{getLocalizedPaymentNotice(selectedPackage)}</p>
+                {paymentMessage ? (
+                  <p className="text-[#FFB86B]">{paymentMessage}</p>
+                ) : null}
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedPackage(null)}
+                onClick={handleVipPayment}
+                disabled={paymentLoading}
                 className="mt-6 h-12 w-full rounded-xl bg-gradient-to-r from-[#6000B3] to-[#8A2BE2] text-[15px] font-bold text-white shadow-[0_10px_24px_rgba(96,0,179,0.35)] transition-transform active:scale-[0.98]"
               >
-                {t("ok")}
+                {paymentLoading ? "Processing..." : t("ok")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPackage(null)}
+                className="mt-3 h-10 w-full rounded-xl border border-white/15 text-[14px] font-medium text-white/72 active:scale-[0.98]"
+              >
+                Cancel
               </button>
             </div>
           </div>
