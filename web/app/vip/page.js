@@ -120,16 +120,14 @@ export default function VipPage() {
     }
   };
 
-  const getTikTokPaymentSdk = () => {
-    if (typeof window === "undefined") return null;
-    return window.TTMinis?.game?.pay || window.TTMinis?.pay || null;
-  };
-
   const payWithTikTokMinis = (tradeOrderId) =>
     new Promise((resolve, reject) => {
-      const pay = getTikTokPaymentSdk();
+      if (!tradeOrderId) {
+        reject(new Error("TikTok payment order id is missing."));
+        return;
+      }
 
-      if (!pay) {
+      if (typeof window === "undefined" || !window.TTMinis) {
         reject(new Error("TikTok payment SDK is not available."));
         return;
       }
@@ -143,7 +141,7 @@ export default function VipPage() {
       }
 
       try {
-        const result = pay.call(window.TTMinis?.game || window.TTMinis, {
+        const options = {
           trade_order_id: tradeOrderId,
           success: (response) => finish(resolve, response),
           fail: (error) =>
@@ -156,7 +154,17 @@ export default function VipPage() {
               ),
             ),
           complete: () => {},
-        });
+        };
+        let result;
+
+        if (window.TTMinis.game?.pay) {
+          result = window.TTMinis.game.pay(options);
+        } else if (window.TTMinis.pay) {
+          result = window.TTMinis.pay(options);
+        } else {
+          reject(new Error("TikTok payment SDK is not available."));
+          return;
+        }
 
         if (result?.then) {
           result.then(resolve).catch(reject);
@@ -175,9 +183,18 @@ export default function VipPage() {
     try {
       setPaymentMessage("Creating TikTok payment order...");
       const order = await createTikTokVipPaymentOrder(selectedPackage.id);
+      const tradeOrderId =
+        order?.trade_order_id ||
+        order?.data?.trade_order_id ||
+        order?.tradeOrderId ||
+        "";
+
+      if (!tradeOrderId) {
+        throw new Error("TikTok payment order id is missing.");
+      }
 
       setPaymentMessage("Opening TikTok payment...");
-      await payWithTikTokMinis(order.trade_order_id);
+      await payWithTikTokMinis(tradeOrderId);
 
       setPaymentMessage("Payment received. Activating VIP...");
       const subscriptionPayload = await waitForActiveVipSubscription();
