@@ -26,6 +26,7 @@ export function getStoredCustomer() {
       customerId: user.id,
       openId: user.open_id,
       customerAuthToken: user.customer_auth_token,
+      tiktokAccessToken: user.access_token || "",
     };
   } catch {
     return null;
@@ -101,4 +102,61 @@ export async function activateVipPackageForTest(packageId) {
   }
 
   return payload;
+}
+
+export async function createTikTokVipPaymentOrder(packageId) {
+  const customer = getStoredCustomer();
+  if (!customer) {
+    throw new Error("Please sign in before subscribing VIP.");
+  }
+
+  if (!customer.tiktokAccessToken) {
+    throw new Error("Please sign in again before paying with TikTok.");
+  }
+
+  const response = await fetch(getApiUrl("/api/tiktok-minis/payment-order"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-customer-auth-token": customer.customerAuthToken,
+    },
+    body: JSON.stringify({
+      customerId: customer.customerId,
+      openId: customer.openId,
+      packageId,
+      tiktokAccessToken: customer.tiktokAccessToken,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || "Unable to create TikTok payment order.");
+  }
+
+  return payload;
+}
+
+export async function waitForActiveVipSubscription({
+  attempts = 20,
+  delayMs = 1500,
+} = {}) {
+  let lastPayload = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    lastPayload = await loadCustomerVipSubscription();
+
+    if (isVipSubscriptionActive(lastPayload.subscription)) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(CUSTOMER_VIP_UPDATED_EVENT, { detail: lastPayload }),
+        );
+      }
+
+      return lastPayload;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  return lastPayload || { is_active: false, subscription: null };
 }

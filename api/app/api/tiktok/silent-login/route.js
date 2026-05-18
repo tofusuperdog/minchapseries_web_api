@@ -122,6 +122,7 @@ export async function POST(request) {
         preferred_language: customer?.preferred_language || null,
         scope: token.scope || "",
         token_type: token.token_type || "",
+        access_token: token.access_token || "",
         expires_in: token.expires_in || null,
         refresh_expires_in: token.refresh_expires_in || null,
       },

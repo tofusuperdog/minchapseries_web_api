@@ -3,7 +3,10 @@
 import { useLanguage } from "../LanguageContext";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { activateVipPackageForTest } from "../lib/customerVip";
+import {
+  createTikTokVipPaymentOrder,
+  waitForActiveVipSubscription,
+} from "../lib/customerVip";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
 export default function VipPage() {
@@ -117,6 +120,52 @@ export default function VipPage() {
     }
   };
 
+  const getTikTokPaymentSdk = () => {
+    if (typeof window === "undefined") return null;
+    return window.TTMinis?.game?.pay || window.TTMinis?.pay || null;
+  };
+
+  const payWithTikTokMinis = (tradeOrderId) =>
+    new Promise((resolve, reject) => {
+      const pay = getTikTokPaymentSdk();
+
+      if (!pay) {
+        reject(new Error("TikTok payment SDK is not available."));
+        return;
+      }
+
+      let isSettled = false;
+
+      function finish(handler, value) {
+        if (isSettled) return;
+        isSettled = true;
+        handler(value);
+      }
+
+      try {
+        const result = pay.call(window.TTMinis?.game || window.TTMinis, {
+          trade_order_id: tradeOrderId,
+          success: (response) => finish(resolve, response),
+          fail: (error) =>
+            finish(
+              reject,
+              new Error(
+                error?.errMsg ||
+                  error?.message ||
+                  "TikTok payment was not completed.",
+              ),
+            ),
+          complete: () => {},
+        });
+
+        if (result?.then) {
+          result.then(resolve).catch(reject);
+        }
+      } catch (error) {
+        finish(reject, error);
+      }
+    });
+
   const handleVipPayment = async () => {
     if (!selectedPackage || paymentLoading) return;
 
@@ -124,7 +173,20 @@ export default function VipPage() {
     setPaymentMessage("");
 
     try {
-      await activateVipPackageForTest(selectedPackage.id);
+      setPaymentMessage("Creating TikTok payment order...");
+      const order = await createTikTokVipPaymentOrder(selectedPackage.id);
+
+      setPaymentMessage("Opening TikTok payment...");
+      await payWithTikTokMinis(order.trade_order_id);
+
+      setPaymentMessage("Payment received. Activating VIP...");
+      const subscriptionPayload = await waitForActiveVipSubscription();
+
+      if (!subscriptionPayload?.subscription?.is_active) {
+        setPaymentMessage("Payment is processing. Please check your VIP status shortly.");
+        return;
+      }
+
       setPaymentMessage("VIP activated");
       setSelectedPackage(null);
       router.replace("/profile");

@@ -97,12 +97,26 @@ function parseWebhookContent(content) {
 }
 
 function getVipPackageIdFromContent(content) {
+  const structuredValue =
+    content.vip_package_id ||
+    content.package_id ||
+    content.packageId ||
+    content.product_id ||
+    content.productId ||
+    content.order_id ||
+    content.orderId ||
+    "";
+  const structuredMatch = String(structuredValue).match(/vip_package_(\d+)/i);
+
+  if (structuredMatch) return Number(structuredMatch[1]);
+
   const rawValue =
     content.vip_package_id ||
     content.package_id ||
     content.packageId ||
     content.product_id ||
     content.productId ||
+    content.orderId ||
     "";
   const match = String(rawValue).match(/\d+/);
 
