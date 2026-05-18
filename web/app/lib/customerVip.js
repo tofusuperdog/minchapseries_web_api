@@ -40,7 +40,7 @@ export function isVipSubscriptionActive(subscription) {
   );
 }
 
-export async function loadCustomerVipSubscription() {
+export async function loadCustomerVipSubscription({ includeHistory = false } = {}) {
   const customer = getStoredCustomer();
   if (!customer) {
     return { is_active: false, subscription: null };
@@ -50,6 +50,9 @@ export async function loadCustomerVipSubscription() {
     customerId: String(customer.customerId),
     openId: customer.openId,
   });
+  if (includeHistory) {
+    params.set("includeHistory", "1");
+  }
   const response = await fetch(
     getApiUrl(`/api/customer/vip-subscription?${params.toString()}`),
     {

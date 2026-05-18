@@ -3,6 +3,10 @@
 import { useLanguage } from "../LanguageContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  CUSTOMER_VIP_UPDATED_EVENT,
+  loadCustomerVipSubscription,
+} from "../lib/customerVip";
 
 const billContent = {
   TH: {
@@ -10,130 +14,59 @@ const billContent = {
     subtitle: "ดูรายการแพ็กเกจที่เคยสมัคร",
     usagePeriod: "เวลาใช้งาน",
     orderNumber: "คำสั่งซื้อ",
-    items: [
-      {
-        id: "MC24091530",
-        plan: "VIP 30 วัน",
-        price: "359 บาท",
-        startDate: "15 ก.ย. 2026",
-        endDate: "15 ต.ค. 2026",
-        icon: "crown",
-      },
-      {
-        id: "MC24090107",
-        plan: "VIP 7 วัน",
-        price: "129 บาท",
-        startDate: "01 ก.ย. 2026",
-        endDate: "08 ก.ย. 2026",
-        icon: "calendar",
-      },
-      {
-        id: "MC24080130",
-        plan: "VIP 30 วัน",
-        price: "359 บาท",
-        startDate: "01 ส.ค. 2026",
-        endDate: "31 ส.ค. 2026",
-        icon: "crown",
-      },
-    ],
+    empty: "ยังไม่มีประวัติการสมัคร",
   },
   EN: {
     title: "Subscription History",
     subtitle: "View packages you have subscribed to",
     usagePeriod: "Active period",
     orderNumber: "Order",
-    items: [
-      {
-        id: "MC24091530",
-        plan: "VIP 30 Days",
-        price: "359 THB",
-        startDate: "Sep 15, 2026",
-        endDate: "Oct 15, 2026",
-        icon: "crown",
-      },
-      {
-        id: "MC24090107",
-        plan: "VIP 7 Days",
-        price: "129 THB",
-        startDate: "Sep 01, 2026",
-        endDate: "Sep 08, 2026",
-        icon: "calendar",
-      },
-      {
-        id: "MC24080130",
-        plan: "VIP 30 Days",
-        price: "359 THB",
-        startDate: "Aug 01, 2026",
-        endDate: "Aug 31, 2026",
-        icon: "crown",
-      },
-    ],
+    empty: "No subscription history yet",
   },
   JP: {
     title: "購読履歴",
     subtitle: "これまで購読したパッケージを確認",
     usagePeriod: "利用期間",
     orderNumber: "注文番号",
-    items: [
-      {
-        id: "MC24091530",
-        plan: "VIP 30日",
-        price: "359 THB",
-        startDate: "2026年9月15日",
-        endDate: "2026年10月15日",
-        icon: "crown",
-      },
-      {
-        id: "MC24090107",
-        plan: "VIP 7日",
-        price: "129 THB",
-        startDate: "2026年9月1日",
-        endDate: "2026年9月8日",
-        icon: "calendar",
-      },
-      {
-        id: "MC24080130",
-        plan: "VIP 30日",
-        price: "359 THB",
-        startDate: "2026年8月1日",
-        endDate: "2026年8月31日",
-        icon: "crown",
-      },
-    ],
+    empty: "購読履歴はまだありません",
   },
   CN: {
     title: "订阅历史",
     subtitle: "查看曾经订阅的套餐",
     usagePeriod: "使用时间",
     orderNumber: "订单号",
-    items: [
-      {
-        id: "MC24091530",
-        plan: "VIP 30 天",
-        price: "359 THB",
-        startDate: "2026年9月15日",
-        endDate: "2026年10月15日",
-        icon: "crown",
-      },
-      {
-        id: "MC24090107",
-        plan: "VIP 7 天",
-        price: "129 THB",
-        startDate: "2026年9月1日",
-        endDate: "2026年9月8日",
-        icon: "calendar",
-      },
-      {
-        id: "MC24080130",
-        plan: "VIP 30 天",
-        price: "359 THB",
-        startDate: "2026年8月1日",
-        endDate: "2026年8月31日",
-        icon: "crown",
-      },
-    ],
+    empty: "暂无订阅历史",
   },
 };
+
+function formatDate(value, language) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat(language === "TH" ? "th-TH" : "en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatOrderId(item) {
+  return (
+    item.source_order_id ||
+    item.source_trade_order_id ||
+    `VIP${String(item.id).padStart(6, "0")}`
+  );
+}
+
+function mapSubscriptionToBillItem(item, language) {
+  return {
+    id: formatOrderId(item),
+    plan: item.package_type || `VIP ${item.duration_days} Days`,
+    price: `${Number(item.bean_amount || 0)} Beans`,
+    startDate: formatDate(item.starts_at, language),
+    endDate: formatDate(item.expires_at, language),
+    icon: Number(item.duration_days) >= 30 ? "crown" : "calendar",
+  };
+}
 
 function PlanIcon({ type }) {
   if (type === "calendar") {
@@ -249,6 +182,8 @@ export default function BillPage() {
   const { language, changeLanguage } = useLanguage();
   const router = useRouter();
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const langDropdownRef = useRef(null);
   const languages = ["TH", "EN", "JP", "CN"];
   const content = billContent[language] || billContent.TH;
@@ -265,6 +200,42 @@ export default function BillPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchHistory() {
+      setLoading(true);
+
+      try {
+        const payload = await loadCustomerVipSubscription({
+          includeHistory: true,
+        });
+        const nextItems = Array.isArray(payload.history)
+          ? payload.history.map((item) =>
+              mapSubscriptionToBillItem(item, language),
+            )
+          : [];
+
+        if (!cancelled) setItems(nextItems);
+      } catch (error) {
+        console.error("Failed to load VIP subscription history:", error);
+        if (!cancelled) setItems([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchHistory();
+    window.addEventListener(CUSTOMER_VIP_UPDATED_EVENT, fetchHistory);
+    window.addEventListener("minchap:tiktok-user-updated", fetchHistory);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(CUSTOMER_VIP_UPDATED_EVENT, fetchHistory);
+      window.removeEventListener("minchap:tiktok-user-updated", fetchHistory);
+    };
+  }, [language]);
 
   return (
     <div className="relative flex h-[calc(100dvh-70px)] w-full flex-col overflow-y-auto bg-black text-white no-scrollbar">
@@ -394,9 +365,19 @@ export default function BillPage() {
 
         <section className="relative z-10 px-2 pt-3">
           <div className="flex flex-col gap-2.5">
-            {content.items.map((item) => (
-              <SubscriptionCard key={item.id} item={item} labels={content} />
-            ))}
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#BF8EFF] border-t-transparent" />
+              </div>
+            ) : items.length > 0 ? (
+              items.map((item) => (
+                <SubscriptionCard key={item.id} item={item} labels={content} />
+              ))
+            ) : (
+              <div className="rounded-[12px] border border-white/10 bg-white/[0.045] px-4 py-8 text-center text-[15px] text-white/58">
+                {content.empty}
+              </div>
+            )}
           </div>
         </section>
       </main>

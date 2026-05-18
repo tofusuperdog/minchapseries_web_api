@@ -222,30 +222,34 @@ export default function AppProfile() {
                     Expires {formatVipExpiry(activeVipSubscription.expires_at)}
                   </p>
                 ) : null}
-                <Link
-                  href="/vip"
-                  className={`mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[12px] bg-gradient-to-b from-[#B24BFF] to-[#7800D7] px-5 font-extrabold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_20px_rgba(143,42,255,0.38)] transition-transform active:scale-[0.98] ${
-                    language === "EN"
-                      ? "max-w-[180px] text-[15px]"
-                      : "max-w-[160px] text-[17px]"
-                  }`}
-                >
-                  {activeVipSubscription
-                    ? activeVipSubscription.package_type
-                    : t("subscribe_vip")}
-                  <svg
-                    className="w-5 h-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                {activeVipSubscription ? (
+                  <div className="mt-4 inline-flex h-10 max-w-[190px] items-center justify-center rounded-[12px] border border-[#D8B4FF]/32 bg-white/[0.07] px-4 text-[14px] font-bold text-[#E9D5FF]">
+                    Active VIP
+                  </div>
+                ) : (
+                  <Link
+                    href="/vip"
+                    className={`mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[12px] bg-gradient-to-b from-[#B24BFF] to-[#7800D7] px-5 font-extrabold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_20px_rgba(143,42,255,0.38)] transition-transform active:scale-[0.98] ${
+                      language === "EN"
+                        ? "max-w-[180px] text-[15px]"
+                        : "max-w-[160px] text-[17px]"
+                    }`}
                   >
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </Link>
+                    {t("subscribe_vip")}
+                    <svg
+                      className="w-5 h-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

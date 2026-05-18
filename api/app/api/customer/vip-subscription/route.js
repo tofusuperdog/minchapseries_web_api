@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   activateCustomerVipSubscription,
   getActiveCustomerVipSubscription,
+  getCustomerVipSubscriptionHistory,
 } from "../../../lib/supabaseAdmin";
 import { corsOptionsResponse, withCorsHeaders } from "../../../lib/cors";
 import { verifyCustomerAuthToken } from "../../../lib/customerAuthToken";
@@ -65,11 +66,21 @@ export async function GET(request) {
     const subscription = await getActiveCustomerVipSubscription({
       customerId: verified.customerId,
     });
+    const includeHistory =
+      searchParams.get("includeHistory") === "1" ||
+      searchParams.get("history") === "1";
+    const history = includeHistory
+      ? await getCustomerVipSubscriptionHistory({
+          customerId: verified.customerId,
+          limit: 30,
+        })
+      : undefined;
 
     return json(request, {
       ok: true,
       is_active: Boolean(subscription?.is_active),
       subscription,
+      ...(includeHistory ? { history } : {}),
     });
   } catch (error) {
     return json(

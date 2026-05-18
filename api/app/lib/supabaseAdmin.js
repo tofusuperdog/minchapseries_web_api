@@ -102,6 +102,36 @@ export async function getActiveCustomerVipSubscription({ customerId }) {
   return normalizeVipSubscription(Array.isArray(payload) ? payload[0] : null);
 }
 
+export async function getCustomerVipSubscriptionHistory({
+  customerId,
+  limit = 30,
+}) {
+  requireSupabaseAdmin();
+
+  const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 30);
+  const response = await fetch(
+    getSupabaseRestUrl(
+      `customer_vip_subscriptions?customer_id=eq.${encodeURIComponent(customerId)}&select=id,customer_id,vip_package_id,package_type,duration_days,bean_amount,starts_at,expires_at,status,source_order_id,source_trade_order_id,created_at&order=created_at.desc&limit=${safeLimit}`,
+    ),
+    {
+      method: "GET",
+      headers: getServiceRoleHeaders(),
+      cache: "no-store",
+    },
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message ||
+        payload?.error ||
+        "Failed to fetch VIP subscription history",
+    );
+  }
+
+  return Array.isArray(payload) ? payload.map(normalizeVipSubscription) : [];
+}
+
 export async function getVipPackageById(packageId) {
   requireSupabaseAdmin();
 
