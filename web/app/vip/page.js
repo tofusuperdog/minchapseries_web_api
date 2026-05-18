@@ -2,11 +2,13 @@
 
 import { useLanguage } from "../LanguageContext";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { activateVipPackageForTest } from "../lib/customerVip";
 import { SUPABASE_HEADERS, supabaseRestUrl } from "../lib/supabase";
 
 export default function VipPage() {
   const { t, language } = useLanguage();
+  const router = useRouter();
 
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +127,7 @@ export default function VipPage() {
       await activateVipPackageForTest(selectedPackage.id);
       setPaymentMessage("VIP activated");
       setSelectedPackage(null);
+      router.replace("/profile");
     } catch (error) {
       setPaymentMessage(error?.message || "Unable to activate VIP");
     } finally {
@@ -270,10 +273,6 @@ export default function VipPage() {
                 {t("subscribe_vip")}
               </h2>
               <div className="space-y-2 text-[15px] leading-relaxed text-white/78">
-                <p>{t("payment_development_notice")}</p>
-                <p className="text-[#BF8EFF]">
-                  {t("payment_flow_label")} : vip_payment_flow
-                </p>
                 <p>{getLocalizedPaymentNotice(selectedPackage)}</p>
                 {paymentMessage ? (
                   <p className="text-[#FFB86B]">{paymentMessage}</p>

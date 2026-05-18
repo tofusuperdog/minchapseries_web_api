@@ -286,21 +286,13 @@ function LayoutContent({ children }) {
       const { status, user } = event.detail || {};
 
       if (["checking", "logging_in", "exchanging"].includes(status)) {
-        if (!getStoredLanguagePreference()) {
-          setLanguageSheet({
-            isOpen: true,
-            mode: "guest",
-            customerId: null,
-            openId: null,
-            customerAuthToken: null,
-          });
-        }
+        setLanguageSheet((current) => ({ ...current, isOpen: false }));
         return;
       }
 
       if (status === "not_tiktok") {
         setLanguageSheet({
-          isOpen: true,
+          isOpen: !getStoredLanguagePreference(),
           mode: "guest",
           customerId: null,
           openId: null,
