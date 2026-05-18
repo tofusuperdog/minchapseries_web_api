@@ -141,28 +141,43 @@ export default function VipPage() {
       }
 
       try {
-        const options = {
-          trade_order_id: tradeOrderId,
-          success: (response) => finish(resolve, response),
-          fail: (error) =>
+        const options = { trade_order_id: tradeOrderId };
+        let result;
+
+        if (window.TTMinis.pay) {
+          result = window.TTMinis.pay((response) => {
+            if (response?.is_success) {
+              finish(resolve, response);
+              return;
+            }
+
             finish(
               reject,
               new Error(
-                error?.errMsg ||
-                  error?.message ||
+                response?.error?.error_msg ||
+                  response?.error?.message ||
+                  response?.error?.error_code ||
                   "TikTok payment was not completed.",
               ),
-            ),
-          complete: () => {},
-        };
-        let result;
-
-        if (window.TTMinis.game?.pay) {
-          result = window.TTMinis.game.pay(options);
-        } else if (window.TTMinis.pay) {
-          result = window.TTMinis.pay(options);
+            );
+          }, options);
+        } else if (window.TTMinis.game?.pay) {
+          result = window.TTMinis.game.pay({
+            ...options,
+            success: (response) => finish(resolve, response),
+            fail: (error) =>
+              finish(
+                reject,
+                new Error(
+                  error?.errMsg ||
+                    error?.message ||
+                    "TikTok payment was not completed.",
+                ),
+              ),
+            complete: () => {},
+          });
         } else {
-          reject(new Error("TikTok payment SDK is not available."));
+          finish(reject, new Error("TikTok payment SDK is not available."));
           return;
         }
 
