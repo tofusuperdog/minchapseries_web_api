@@ -5,6 +5,131 @@ import { getApiUrl } from "./apiBaseUrl";
 const TIKTOK_USER_STORAGE_KEY = "minchap_tiktok_user";
 export const CUSTOMER_VIP_UPDATED_EVENT = "minchap_customer_vip_updated";
 
+function storeTikTokUser(user) {
+  if (typeof window === "undefined") return;
+
+  if (!user?.id) {
+    window.localStorage.removeItem(TIKTOK_USER_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(TIKTOK_USER_STORAGE_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event("minchap:tiktok-user-updated"));
+}
+
+const waitForTikTokMinis = async () => {
+  const maxAttempts = 20;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (typeof window !== "undefined" && window.TTMinis?.login) {
+      return window.TTMinis;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+
+  return null;
+};
+
+const getAuthorizationCode = (loginResult) =>
+  loginResult?.code ||
+  loginResult?.authorizationCode ||
+  loginResult?.AuthorizationCode ||
+  loginResult?.authCode ||
+  loginResult?.authResponse?.code ||
+  loginResult?.authResponse?.authorizationCode ||
+  loginResult?.data?.authResponse?.code ||
+  loginResult?.data?.code ||
+  "";
+
+const formatError = (error) => {
+  if (!error) return "Unknown error";
+  if (typeof error === "string") return error;
+  return error.message || error.errMsg || JSON.stringify(error);
+};
+
+const loginWithTikTokMinis = (ttMinis) =>
+  new Promise((resolve, reject) => {
+    let isSettled = false;
+    const timeoutId = setTimeout(() => {
+      finish(reject, new Error("TikTok login timed out."));
+    }, 15000);
+
+    function finish(handler, value) {
+      if (isSettled) return;
+      isSettled = true;
+      clearTimeout(timeoutId);
+      handler(value);
+    }
+
+    try {
+      const result = ttMinis.login(
+        (response) => {
+          if (getAuthorizationCode(response)) {
+            finish(resolve, response);
+            return;
+          }
+
+          finish(
+            reject,
+            new Error(
+              `TikTok login did not return an authorization code: ${formatError(response)}`,
+            ),
+          );
+        },
+        {
+          returnScopes: true,
+        },
+      );
+
+      if (result?.then) {
+        result.then(resolve).catch(reject);
+      } else if (getAuthorizationCode(result)) {
+        finish(resolve, result);
+      }
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+
+export async function refreshTikTokCustomerSession() {
+  const ttMinis = await waitForTikTokMinis();
+
+  if (!ttMinis) {
+    throw new Error("TikTok SDK is not available. Please open this in TikTok.");
+  }
+
+  if (!window.__MINCHAP_TIKTOK_SDK_READY__ && ttMinis.init) {
+    ttMinis.init({ clientKey: window.__MINCHAP_TIKTOK_CLIENT_KEY__ });
+    window.__MINCHAP_TIKTOK_SDK_READY__ = true;
+  }
+
+  const loginResult = await loginWithTikTokMinis(ttMinis);
+  const code = getAuthorizationCode(loginResult);
+
+  if (!code) {
+    throw new Error("TikTok login did not return an authorization code.");
+  }
+
+  const response = await fetch(getApiUrl("/api/tiktok/silent-login"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || `Backend login failed: ${response.status}`);
+  }
+
+  if (!payload.user?.access_token) {
+    throw new Error("TikTok login did not return a payment access token.");
+  }
+
+  storeTikTokUser(payload.user);
+  return getStoredCustomer();
+}
+
 export function getStoredCustomer() {
   if (typeof window === "undefined") return null;
 
@@ -105,12 +230,16 @@ export async function activateVipPackageForTest(packageId) {
 }
 
 export async function createTikTokVipPaymentOrder(packageId) {
-  const customer = getStoredCustomer();
+  let customer = getStoredCustomer();
   if (!customer) {
     throw new Error("Please sign in before subscribing VIP.");
   }
 
   if (!customer.tiktokAccessToken) {
+    customer = await refreshTikTokCustomerSession();
+  }
+
+  if (!customer?.tiktokAccessToken) {
     throw new Error("Please sign in again before paying with TikTok.");
   }
 
